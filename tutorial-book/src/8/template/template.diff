@@ -1,0 +1,155 @@
+diff --git a/node/src/chain_spec.rs b/node/src/chain_spec.rs
+index 091d0e8..90e5e84 100644
+--- a/node/src/chain_spec.rs
++++ b/node/src/chain_spec.rs
+@@ -2,6 +2,8 @@ use std::str::FromStr;
+ 
+ use academy_pow_runtime::{
+ 	AccountId, SS58Prefix, Signature, TOKEN_DECIMALS, TOKEN_SYMBOL, WASM_BINARY,
++    // TODO [6-genesis-builder]
++    utxo::{GenesisUtxoType, Value},
+ };
+ use multi_pow::{ForkHeights, ForkingConfig, MaxiPosition};
+ use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
+@@ -109,6 +111,13 @@ pub fn development_config() -> Result<ChainSpec, String> {
+ 		],
+ 		// Initial Difficulty
+ 		4_000_000,
++        // TODO [6-genesis-builder]
++        // vec![
++        //     get_account_id_from_seed::<sr25519::Public>("Alice"),
++        //     get_account_id_from_seed::<sr25519::Public>("Bob"),
++        //     get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
++        //     get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
++        // ],
+ 	))
+ 	.with_properties(system_properties())
+ 	.build())
+@@ -136,12 +145,24 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
+ 			get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+ 		],
+ 		4_000_000,
++        // TODO [6-genesis-builder]
++        // vec![
++        //     get_account_id_from_seed::<sr25519::Public>("Alice"),
++        //     get_account_id_from_seed::<sr25519::Public>("Bob"),
++        //     get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
++        //     get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
++        // ],
+ 	))
+ 	.with_properties(system_properties())
+ 	.build())
+ }
+ 
+-fn genesis(endowed_accounts: Vec<AccountId>, initial_difficulty: u32) -> serde_json::Value {
++fn genesis(
++    endowed_accounts: Vec<AccountId>,
++    initial_difficulty: u32,
++    // TODO [6-genesis-builder]
++    // utxo_genesis_accounts: Vec<AccountId>,
++) -> serde_json::Value {
+ 	serde_json::json!({
+ 		"balances": {
+ 			// Configure endowed accounts with initial balance of 1 << 50.
+@@ -156,6 +177,18 @@ fn genesis(endowed_accounts: Vec<AccountId>, initial_difficulty: u32) -> serde_j
+ 		"sha3DifficultyAdjustment": {
+ 			"initialDifficulty": u32_to_u8_32(initial_difficulty),
+ 		},
++        // TODO [6-genesis-builder]
++        // "utxo": {
++        //     "genesisUtxos": utxo_genesis_accounts
++        //         .iter().cloned()
++        //         .map(|k| {
++        //             let hash = H256::from_slice(&k.as_slice()); 
++        //             let value: Value = (1u64 << 50).into();
++        //             let genesis_utxo: GenesisUtxoType = (value, hash);
++
++        //             genesis_utxo
++        //         }).collect::<Vec<GenesisUtxoType>>(),
++        // },
+ 	})
+ }
+ 
+diff --git a/runtime/src/utxo.rs b/runtime/src/utxo.rs
+index ed8ec6a..0632046 100644
+--- a/runtime/src/utxo.rs
++++ b/runtime/src/utxo.rs
+@@ -57,6 +57,21 @@ pub struct TransactionOutput {
+     pub pubkey: H256,
+ }
+ 
++
++/// TODO [6-genesis-builder]
++/// Because code is built on `no-std` feature.
++/// And we got error:
++/// ```
++/// ...
++/// the trait `Serialize` is not implemented for `TransactionOutput`
++/// the trait `Deserialize<'_>` is not implemented for `TransactionOutput`
++/// ...
++/// ```
++///
++/// Hence, we need to simplify data type to make it work in both `std` and `no-std` feature.
++/// Genesis Utxo Type
++// pub type GenesisUtxoType = (Value, H256);
++
+ #[frame_support::pallet(dev_mode)]
+ pub mod pallet {
+     use frame_support::pallet_prelude::*;
+@@ -105,6 +120,44 @@ pub mod pallet {
+         QueryKind = OptionQuery,
+     >;
+ 
++    /// TODO [6-genesis-builder]
++    /// Keep track of latest UTXO hash of account
++    /// Mapping from `sr25519::Pubkey` to `BlakeTwo256::hash_of(transaction, index)`
++    /// Just for testing 🫤
++    /// Because 1 account may have multiple UTXOs
++    // #[pallet::storage]
++    // #[pallet::getter(fn utxo_of)]
++    // pub type UtxoOf<T: Config> =
++    //     StorageMap<Hasher = Identity, Key = Public, Value = H256, QueryKind = OptionQuery>;
++
++    /// TODO [6-genesis-builder]
++    // #[pallet::genesis_config]
++    // pub struct GenesisConfig<T: Config> {
++    //     pub _ph_data: Option<PhantomData<T>>,
++    //     pub genesis_utxos: Vec<GenesisUtxoType>,
++    // }
++
++    /// TODO [6-genesis-builder]
++    // impl<T: Config> Default for GenesisConfig<T> {
++    //     fn default() -> Self {
++    //         Self {
++    //             _ph_data: Default::default(),
++    //             genesis_utxos: Vec::<GenesisUtxoType>::new(),
++    //         }
++    //     }
++    // }
++
++    /// TODO [6-genesis-builder]
++    // #[pallet::genesis_build]
++    // impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
++    //     fn build(&self) {
++    //         for utxo in self.genesis_utxos.iter() {
++    //             let utxo = TransactionOutput { value: utxo.0, pubkey: utxo.1 };
++    //             let hash = BlakeTwo256::hash_of(&utxo);
++    //             Pallet::<T>::store_utxo(&utxo, hash);
++    //         }
++    //     }
++    // }
+ 
+     /// [2-data-structure]
+     /// Pallets use events to inform users when important changes are made.
+@@ -250,7 +303,10 @@ pub mod pallet {
+             // [3-spend-utxo]
+             UtxoStore::<T>::insert(hash, utxo);
+             
+-            // // further update 😉
++            // TODO [6-genesis-builder]
++            // Convert H256 back to sr25519::Public
++            // let pubkey = Public::from_h256(utxo.pubkey);
++            // UtxoOf::<T>::insert(pubkey, hash);
+         }
+ 
+         /// Strips a transaction of its Signature fields by replacing value with ZERO-initialized fixed hash.

@@ -1,0 +1,3750 @@
+diff --git a/multi-pow/src/lib.rs b/multi-pow/src/lib.rs
+index 8c36e58..d3c0d24 100644
+--- a/multi-pow/src/lib.rs
++++ b/multi-pow/src/lib.rs
+@@ -3,16 +3,16 @@
+ //! It is multi-pow in the sense that there are multiple supported hashing algorithms.
+ //! A seal with any of the supported hashing algorithms will be accepted.
+ //!
+-//! The purpose of this design is to demonstrate hard and soft forks by adding and removing valid hashing algorithms.
+-//! While there is no precedent for changing hashing algorithms in the real world yet, it is conceivable that
+-//! a chain may want to upgrade to a new algorithm when the old one is suspected weak.
+-//! In any case, the point is that we want to demonstrate hard and soft forks in an understandable way,
+-//! the multiple hashing algorithms achieves that well.
++//! The purpose of this design is to demonstrate hard and soft forks by adding and removing valid
++//! hashing algorithms. While there is no precedent for changing hashing algorithms in the real
++//! world yet, it is conceivable that a chain may want to upgrade to a new algorithm when the old
++//! one is suspected weak. In any case, the point is that we want to demonstrate hard and soft forks
++//! in an understandable way, the multiple hashing algorithms achieves that well.
+ //!
+-//! In the future, the hope is that there will be a dedicated difficulty threshold for each hashing algorithm.
+-//! But currently the Substrate PoW crates are not that flexible.
+-//! We could solve it by adding a pre-digest that includes information about what hashing algo is being used
+-//! for the runtime to use later in the difficulty adjustment.
++//! In the future, the hope is that there will be a dedicated difficulty threshold for each hashing
++//! algorithm. But currently the Substrate PoW crates are not that flexible.
++//! We could solve it by adding a pre-digest that includes information about what hashing algo is
++//! being used for the runtime to use later in the difficulty adjustment.
+ 
+ #![cfg_attr(not(feature = "std"), no_std)]
+ 
+@@ -41,55 +41,55 @@ use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+ /// A struct that represents a difficulty threshold.
+ /// Unlike a normal PoW algorithm this struct has a separate threshold for each hash
+ #[derive(
+-    Clone,
+-    Copy,
+-    PartialEq,
+-    Eq,
+-    PartialOrd,
+-    Ord,
+-    Encode,
+-    Decode,
+-    Debug,
+-    Default,
+-    scale_info::TypeInfo,
++	Clone,
++	Copy,
++	PartialEq,
++	Eq,
++	PartialOrd,
++	Ord,
++	Encode,
++	Decode,
++	Debug,
++	Default,
++	scale_info::TypeInfo,
+ )]
+ pub struct Threshold {
+-    pub md5: U256,
+-    pub sha3: U256,
+-    pub keccak: U256,
++	pub md5: U256,
++	pub sha3: U256,
++	pub keccak: U256,
+ }
+ 
+ // This trait does not seem to be fully baked in the Substrate PoW code
+ // But we do need some kind of sinsible impl here so the node can import blocks.
+ // so I will not use it for now.
+ impl TotalDifficulty for Threshold {
+-    fn increment(&mut self, other: Threshold) {
+-        self.md5 += other.md5;
+-        self.sha3 += other.sha3;
+-        self.keccak += other.keccak;
+-    }
++	fn increment(&mut self, other: Threshold) {
++		self.md5 += other.md5;
++		self.sha3 += other.sha3;
++		self.keccak += other.keccak;
++	}
+ }
+ 
+ /// An enum that represents the supported hash types
+ #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Debug)]
+ pub enum SupportedHashes {
+-    Md5,
+-    Sha3,
+-    Keccak,
++	Md5,
++	Sha3,
++	Keccak,
+ }
+ 
+ impl Default for SupportedHashes {
+-    fn default() -> Self {
+-        Self::Sha3
+-    }
++	fn default() -> Self {
++		Self::Sha3
++	}
+ }
+ 
+ /// A struct that represents a concrete hash value tagged with what hashing
+ ///  algorithm was used to compute it.
+ #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Debug, Default)]
+ pub struct MultiHash {
+-    pub algo: SupportedHashes,
+-    pub value: H256,
++	pub algo: SupportedHashes,
++	pub value: H256,
+ }
+ 
+ /// Determine whether the given hash satisfies the given difficulty.
+@@ -97,325 +97,310 @@ pub struct MultiHash {
+ /// overflows the bounds of U256, then the product (and thus the hash)
+ /// was too high.
+ pub fn simple_hash_meets_difficulty(hash: &H256, difficulty: U256) -> bool {
+-    let num_hash = U256::from_little_endian(&hash[..]);
+-    let (_, overflowed) = num_hash.overflowing_mul(difficulty);
++	let num_hash = U256::from_little_endian(&hash[..]);
++	let (_, overflowed) = num_hash.overflowing_mul(difficulty);
+ 
+-    !overflowed
++	!overflowed
+ }
+ 
+ pub fn multi_hash_meets_difficulty(hash: &MultiHash, difficulty: Threshold) -> bool {
+-    match hash.algo {
+-        SupportedHashes::Md5 => simple_hash_meets_difficulty(&hash.value, difficulty.md5),
+-        SupportedHashes::Sha3 => simple_hash_meets_difficulty(&hash.value, difficulty.sha3),
+-        SupportedHashes::Keccak => simple_hash_meets_difficulty(&hash.value, difficulty.keccak),
+-    }
++	match hash.algo {
++		SupportedHashes::Md5 => simple_hash_meets_difficulty(&hash.value, difficulty.md5),
++		SupportedHashes::Sha3 => simple_hash_meets_difficulty(&hash.value, difficulty.sha3),
++		SupportedHashes::Keccak => simple_hash_meets_difficulty(&hash.value, difficulty.keccak),
++	}
+ }
+ 
+ /// A Seal struct that will be encoded to a Vec<u8> as used as the
+ /// `RawSeal` type.
+ #[derive(Clone, PartialEq, Eq, Encode, Decode, Debug)]
+ pub struct Seal {
+-    pub work: MultiHash,
+-    pub difficulty: Threshold,
+-    pub nonce: U256,
++	pub work: MultiHash,
++	pub difficulty: Threshold,
++	pub nonce: U256,
+ }
+ 
+ /// A not-yet-computed attempt to solve the proof of work. Calling the
+ /// compute method will compute the hash and return the seal.
+ #[derive(Clone, PartialEq, Eq, Encode, Decode, Debug)]
+ pub struct Compute {
+-    pub difficulty: Threshold,
+-    pub pre_hash: H256,
+-    pub nonce: U256,
++	pub difficulty: Threshold,
++	pub pre_hash: H256,
++	pub nonce: U256,
+ }
+ 
+ #[cfg(feature = "std")]
+ impl Compute {
+-    pub fn compute(self, algo: SupportedHashes) -> Seal {
+-        let value = match algo {
+-            SupportedHashes::Md5 => {
+-                // The md5 is only 16 byte output, so we just concatenate it twice to
+-                // get an H256
+-                let bytes = *md5::compute(&self.encode()[..]);
+-                let mut doubled = [0u8; 32];
+-                doubled[0..16].copy_from_slice(&bytes[0..16]);
+-                doubled[16..32].copy_from_slice(&bytes[0..16]);
+-
+-                H256::from(doubled)
+-            }
+-            SupportedHashes::Sha3 => {
+-                H256::from_slice(Sha3_256::digest(&self.encode()[..]).as_slice())
+-            }
+-            SupportedHashes::Keccak => {
+-                H256::from_slice(Keccak256::digest(&self.encode()[..]).as_slice())
+-            }
+-        };
+-
+-        Seal {
+-            nonce: self.nonce,
+-            difficulty: self.difficulty,
+-            work: MultiHash { algo, value },
+-        }
+-    }
++	pub fn compute(self, algo: SupportedHashes) -> Seal {
++		let value = match algo {
++			SupportedHashes::Md5 => {
++				// The md5 is only 16 byte output, so we just concatenate it twice to
++				// get an H256
++				let bytes = *md5::compute(&self.encode()[..]);
++				let mut doubled = [0u8; 32];
++				doubled[0..16].copy_from_slice(&bytes[0..16]);
++				doubled[16..32].copy_from_slice(&bytes[0..16]);
++
++				H256::from(doubled)
++			},
++			SupportedHashes::Sha3 =>
++				H256::from_slice(Sha3_256::digest(&self.encode()[..]).as_slice()),
++			SupportedHashes::Keccak =>
++				H256::from_slice(Keccak256::digest(&self.encode()[..]).as_slice()),
++		};
++
++		Seal { nonce: self.nonce, difficulty: self.difficulty, work: MultiHash { algo, value } }
++	}
+ }
+ 
+ #[cfg(feature = "std")]
+ /// A complete PoW Algorithm that uses multiple hashing algorithms.
+ /// Needs a reference to the client so it can grab the difficulty from the runtime.
+ pub struct MultiPow<C> {
+-    client: Arc<C>,
+-    fork_config: ForkingConfig,
++	client: Arc<C>,
++	fork_config: ForkingConfig,
+ }
+ 
+ #[cfg(feature = "std")]
+ impl<C> MultiPow<C> {
+-    pub fn new(client: Arc<C>, fork_config: ForkingConfig) -> Self {
+-        Self {
+-            client,
+-            fork_config,
+-        }
+-    }
++	pub fn new(client: Arc<C>, fork_config: ForkingConfig) -> Self {
++		Self { client, fork_config }
++	}
+ }
+ 
+ //TODO could maybe derive clone_no_bound
+ #[cfg(feature = "std")]
+ impl<C> Clone for MultiPow<C> {
+-    fn clone(&self) -> Self {
+-        Self::new(self.client.clone(), self.fork_config)
+-    }
++	fn clone(&self) -> Self {
++		Self::new(self.client.clone(), self.fork_config)
++	}
+ }
+ 
+ // Here we implement the general PowAlgorithm trait for our concrete algorithm.
+ #[cfg(feature = "std")]
+ impl<B: BlockT<Hash = H256>, C> PowAlgorithm<B> for MultiPow<C>
+ where
+-    C: ProvideRuntimeApi<B>,
+-    C::Api: DifficultyApi<B, Threshold>,
+-    C: sc_client_api::HeaderBackend<B>,
++	C: ProvideRuntimeApi<B>,
++	C::Api: DifficultyApi<B, Threshold>,
++	C: sc_client_api::HeaderBackend<B>,
+ {
+-    type Difficulty = Threshold;
+-
+-    fn difficulty(&self, parent: B::Hash) -> Result<Self::Difficulty, Error<B>> {
+-        let difficulty = self
+-            .client
+-            .runtime_api()
+-            .difficulty(parent)
+-            .map_err(|err| {
+-                sc_consensus_pow::Error::Environment(format!(
+-                    "Fetching difficulty from runtime failed: {:?}",
+-                    err
+-                ))
+-            })?;
+-
+-        Ok(difficulty)
+-    }
+-
+-    fn verify(
+-        &self,
+-        parent_id: &BlockId<B>,
+-        pre_hash: &H256,
+-        pre_digest: Option<&[u8]>,
+-        seal: &RawSeal,
+-        difficulty: Self::Difficulty,
+-    ) -> Result<bool, Error<B>> {
+-        // Try to construct a seal object by decoding the raw seal given
+-        let seal = match Seal::decode(&mut &seal[..]) {
+-            Ok(seal) => seal,
+-            Err(_) => return Ok(false),
+-        };
+-
+-        log::debug!("✅ Decode seal passed!");
+-
+-        let Some(_encoded_pre_digest) = pre_digest else {
+-            return Ok(false);
+-        };
+-
+-        log::debug!("✅ Checksum digest passed!");
+-
+-        // // TODO idk why this always return md5 only
+-        // let algo_from_predigest = match SupportedHashes::decode(&mut &encoded_pre_digest[..]) {
+-        //     Ok(algo) => algo,
+-        //     Err(_) => return Ok(false),
+-        // };
+-
+-        // log::debug!("✅ Get algorithm from digest passed!");
+-
+-        // // Check that the pre-digest algo matches the seal algo
+-        // // TODO it shouldn't be necessary to have both.
+-        // if seal.work.algo != algo_from_predigest {
+-        //     return Ok(false);
+-        // }
+-
+-        // log::debug!("✅ Checksum algorithm from seal passed!");
+-
+-        // This is where we handle forks on the verification side.
+-        // We will still need to handle it in the mining algorithm somewhere.
+-        // Currently we make the miner configure what algo they mine manually with their cli.
+-        let parent_number: u32 = match parent_id {
+-            BlockId::Hash(h) => *self
+-                .client
+-                .header(*h)
+-                .expect("Database should perform lookup successfully")
+-                .expect("parent header should be present in the db")
+-                .number(),
+-            BlockId::Number(n) => *n,
+-        }
+-        .try_into()
+-        .map_err(|_| ())
+-        .expect("Block numbers can be converted to u32 (because they are u32)");
+-
+-        log::debug!("✅ Checksum parent block number passed!");
+-
+-        // Here we handle the forking logic according the the node operator's request.
+-        let valid_algorithm = match self.fork_config {
+-            ForkingConfig::Manual => manual_fork_validation(parent_number, seal.work.algo),
+-            ForkingConfig::Automatic(fork_heights, maxi_position) => {
+-                auto_fork_validation(parent_number, seal.work.algo, fork_heights, maxi_position)
+-            }
+-        };
+-
+-        if !valid_algorithm {
+-            return Ok(false);
+-        }
+-
+-        log::debug!("✅ Valid algorithm!");
+-
+-        // See whether the hash meets the difficulty requirement. If not, fail fast.
+-        if !multi_hash_meets_difficulty(&seal.work, difficulty) {
+-            return Ok(false);
+-        }
+-
+-        log::debug!("✅ Checksum difficulty passed!");
+-
+-        // Make sure the provided work actually comes from the correct pre_hash
+-        let compute = Compute {
+-            difficulty,
+-            pre_hash: *pre_hash,
+-            nonce: seal.nonce,
+-        };
+-
+-        if compute.compute(seal.work.algo) != seal {
+-            return Ok(false);
+-        }
+-
+-        log::debug!("✅ Re-compute passed!");
+-
+-        log::debug!("🛠️ All passed, append the block to the chain ...");
+-
+-        Ok(true)
+-    }
++	type Difficulty = Threshold;
++
++	fn difficulty(&self, parent: B::Hash) -> Result<Self::Difficulty, Error<B>> {
++		let difficulty = self.client.runtime_api().difficulty(parent).map_err(|err| {
++			sc_consensus_pow::Error::Environment(format!(
++				"Fetching difficulty from runtime failed: {:?}",
++				err
++			))
++		})?;
++
++		Ok(difficulty)
++	}
++
++	fn verify(
++		&self,
++		parent_id: &BlockId<B>,
++		pre_hash: &H256,
++		pre_digest: Option<&[u8]>,
++		seal: &RawSeal,
++		difficulty: Self::Difficulty,
++	) -> Result<bool, Error<B>> {
++		// Try to construct a seal object by decoding the raw seal given
++		let seal = match Seal::decode(&mut &seal[..]) {
++			Ok(seal) => seal,
++			Err(_) => return Ok(false),
++		};
++
++		log::debug!("✅ Decode seal passed!");
++
++		let Some(_encoded_pre_digest) = pre_digest else {
++			return Ok(false);
++		};
++
++		log::debug!("✅ Checksum digest passed!");
++
++		// // TODO idk why this always return md5 only
++		// let algo_from_predigest = match SupportedHashes::decode(&mut &encoded_pre_digest[..]) {
++		//     Ok(algo) => algo,
++		//     Err(_) => return Ok(false),
++		// };
++
++		// log::debug!("✅ Get algorithm from digest passed!");
++
++		// // Check that the pre-digest algo matches the seal algo
++		// // TODO it shouldn't be necessary to have both.
++		// if seal.work.algo != algo_from_predigest {
++		//     return Ok(false);
++		// }
++
++		// log::debug!("✅ Checksum algorithm from seal passed!");
++
++		// This is where we handle forks on the verification side.
++		// We will still need to handle it in the mining algorithm somewhere.
++		// Currently we make the miner configure what algo they mine manually with their cli.
++		let parent_number: u32 = match parent_id {
++			BlockId::Hash(h) => *self
++				.client
++				.header(*h)
++				.expect("Database should perform lookup successfully")
++				.expect("parent header should be present in the db")
++				.number(),
++			BlockId::Number(n) => *n,
++		}
++		.try_into()
++		.map_err(|_| ())
++		.expect("Block numbers can be converted to u32 (because they are u32)");
++
++		log::debug!("✅ Checksum parent block number passed!");
++
++		// Here we handle the forking logic according the the node operator's request.
++		let valid_algorithm = match self.fork_config {
++			ForkingConfig::Manual => manual_fork_validation(parent_number, seal.work.algo),
++			ForkingConfig::Automatic(fork_heights, maxi_position) =>
++				auto_fork_validation(parent_number, seal.work.algo, fork_heights, maxi_position),
++		};
++
++		if !valid_algorithm {
++			return Ok(false);
++		}
++
++		log::debug!("✅ Valid algorithm!");
++
++		// See whether the hash meets the difficulty requirement. If not, fail fast.
++		if !multi_hash_meets_difficulty(&seal.work, difficulty) {
++			return Ok(false);
++		}
++
++		log::debug!("✅ Checksum difficulty passed!");
++
++		// Make sure the provided work actually comes from the correct pre_hash
++		let compute = Compute { difficulty, pre_hash: *pre_hash, nonce: seal.nonce };
++
++		if compute.compute(seal.work.algo) != seal {
++			return Ok(false);
++		}
++
++		log::debug!("✅ Re-compute passed!");
++
++		log::debug!("🛠️ All passed, append the block to the chain ...");
++
++		Ok(true)
++	}
+ }
+ 
+ #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+ ///
+ pub struct ForkHeights {
+-    /// The block height to perform the soft fork that adds sha3 and keccak support.
+-    pub add_sha3_keccak: u32,
+-    /// The block height to perform the hard fork that removes md5 support.
+-    pub remove_md5: u32,
+-    /// The block height to perform the contentious fork where some become sha3- or keccak-maxis.
+-    pub split_sha3_keccak: u32,
++	/// The block height to perform the soft fork that adds sha3 and keccak support.
++	pub add_sha3_keccak: u32,
++	/// The block height to perform the hard fork that removes md5 support.
++	pub remove_md5: u32,
++	/// The block height to perform the contentious fork where some become sha3- or keccak-maxis.
++	pub split_sha3_keccak: u32,
+ }
+ 
+ /// Various political positions a node could take when the network is forking into
+ /// keccak maxis and sha3 maxis
+ #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+ pub enum MaxiPosition {
+-    /// Allow all blocks, both sha3 and keccak
+-    NoMaxi,
+-    /// Only allow sha3 blocks
+-    Sha3Maxi,
+-    /// Only allow keccak blocks
+-    KeccakMaxi,
+-    /// Only allow a single type of blocks. Which type it is is determined by what algo the node is mining.
+-    FollowMining,
++	/// Allow all blocks, both sha3 and keccak
++	NoMaxi,
++	/// Only allow sha3 blocks
++	Sha3Maxi,
++	/// Only allow keccak blocks
++	KeccakMaxi,
++	/// Only allow a single type of blocks. Which type it is is determined by what algo the node is
++	/// mining.
++	FollowMining,
+ }
+ 
+ #[derive(Copy, Clone, Eq, PartialEq)]
+ /// The actual properly typed config after we're done working around all the BS.
+ pub enum ForkingConfig {
+-    ///
+-    Manual,
+-    ///
+-    Automatic(ForkHeights, MaxiPosition),
++	///
++	Manual,
++	///
++	Automatic(ForkHeights, MaxiPosition),
+ }
+ 
+ impl FromStr for MaxiPosition {
+-    type Err = ();
+-
+-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+-        Ok(match &s.to_lowercase()[..] {
+-            "allow-all" | "allowall" | "no-maxi" | "nomaxi" => Self::NoMaxi,
+-            "sha3-maxi" | "sha3maxi" => Self::Sha3Maxi,
+-            "keccak-maxi" | "keccakmaxi" => Self::KeccakMaxi,
+-            _ => Self::FollowMining,
+-        })
+-    }
++	type Err = ();
++
++	fn from_str(s: &str) -> Result<Self, Self::Err> {
++		Ok(match &s.to_lowercase()[..] {
++			"allow-all" | "allowall" | "no-maxi" | "nomaxi" => Self::NoMaxi,
++			"sha3-maxi" | "sha3maxi" => Self::Sha3Maxi,
++			"keccak-maxi" | "keccakmaxi" => Self::KeccakMaxi,
++			_ => Self::FollowMining,
++		})
++	}
+ }
+ 
+-/// Manual mode, the node operator manually specifies which hashing algorithms are valid through the mining client.
+-/// If you would like to do a fork, simply allow, un-allow some algorithms to check it.
++/// Manual mode, the node operator manually specifies which hashing algorithms are valid through the
++/// mining client. If you would like to do a fork, simply allow, un-allow some algorithms to check
++/// it.
+ fn manual_fork_validation(_parent_number: u32, algo: SupportedHashes) -> bool {
+-    use SupportedHashes::*;
+-
+-    // To begin with, allow all algorithms.
+-    // After the fork height this check is skipped so all the hashes become valid.
+-    match algo {
+-        Md5 => true,
+-        Sha3 => true,
+-        Keccak => true,
+-    }
++	use SupportedHashes::*;
++
++	// To begin with, allow all algorithms.
++	// After the fork height this check is skipped so all the hashes become valid.
++	match algo {
++		Md5 => true,
++		Sha3 => true,
++		Keccak => true,
++	}
+ }
+ 
+ /// In automatic mode, the `ForkHeights` and `MaxiPosition` structs define the forking schedule
+ /// and the node's behavior during the contentious fork
+ /// (where the network splits into two chains supporting different hashing algorithms).
+ /// The validation logic considers the parent block height,
+-/// forking configuration parameters, and the hashing algorithm used in the PoW solution to determine its validity.
++/// forking configuration parameters, and the hashing algorithm used in the PoW solution to
++/// determine its validity.
+ fn auto_fork_validation(
+-    parent_number: u32,
+-    algo: SupportedHashes,
+-    fork_heights: ForkHeights,
+-    maxi_position: MaxiPosition,
++	parent_number: u32,
++	algo: SupportedHashes,
++	fork_heights: ForkHeights,
++	maxi_position: MaxiPosition,
+ ) -> bool {
+-    use MaxiPosition::*;
+-    use SupportedHashes::*;
+-
+-    log::debug!("parent_number: {:?}", parent_number);
+-    log::debug!("fork_heights: {:?}", fork_heights);
+-
+-    if parent_number < fork_heights.add_sha3_keccak {
+-        // To begin with we only allow md5 hashes for our pow.
+-        // After the fork height this check is skipped so all the hashes become valid.
+-        match algo {
+-            Md5 => true,
+-            Sha3 => false,
+-            Keccak => false,
+-        }
+-    } else if parent_number < fork_heights.remove_md5 {
+-        // After the first fork, all three algos become valid.
+-        match algo {
+-            Md5 => true,
+-            Sha3 => true,
+-            Keccak => true,
+-        }
+-    } else if parent_number < fork_heights.split_sha3_keccak {
+-        // After the second fork, md5 is no longer valid.
+-        match algo {
+-            Md5 => false,
+-            Sha3 => true,
+-            Keccak => true,
+-        }
+-    } else {
+-        // Finally we have the contentious fork.
+-        // Our behavior here depends which maxi position we have taken.
+-        #[allow(clippy::match_like_matches_macro)]
+-        match (algo, maxi_position) {
+-            (Sha3, Sha3Maxi) => true,
+-            (Sha3, NoMaxi) => true,
+-            (Keccak, KeccakMaxi) => true,
+-            (Keccak, NoMaxi) => true,
+-            _ => false,
+-        }
+-    }
++	use MaxiPosition::*;
++	use SupportedHashes::*;
++
++	log::debug!("parent_number: {:?}", parent_number);
++	log::debug!("fork_heights: {:?}", fork_heights);
++
++	if parent_number < fork_heights.add_sha3_keccak {
++		// To begin with we only allow md5 hashes for our pow.
++		// After the fork height this check is skipped so all the hashes become valid.
++		match algo {
++			Md5 => true,
++			Sha3 => false,
++			Keccak => false,
++		}
++	} else if parent_number < fork_heights.remove_md5 {
++		// After the first fork, all three algos become valid.
++		match algo {
++			Md5 => true,
++			Sha3 => true,
++			Keccak => true,
++		}
++	} else if parent_number < fork_heights.split_sha3_keccak {
++		// After the second fork, md5 is no longer valid.
++		match algo {
++			Md5 => false,
++			Sha3 => true,
++			Keccak => true,
++		}
++	} else {
++		// Finally we have the contentious fork.
++		// Our behavior here depends which maxi position we have taken.
++		#[allow(clippy::match_like_matches_macro)]
++		match (algo, maxi_position) {
++			(Sha3, Sha3Maxi) => true,
++			(Sha3, NoMaxi) => true,
++			(Keccak, KeccakMaxi) => true,
++			(Keccak, NoMaxi) => true,
++			_ => false,
++		}
++	}
+ }
+diff --git a/node/build.rs b/node/build.rs
+index f97fd98..aa9206c 100644
+--- a/node/build.rs
++++ b/node/build.rs
+@@ -1,4 +1,4 @@
+ fn main() {
+-    substrate_build_script_utils::generate_cargo_keys();
+-    substrate_build_script_utils::rerun_if_git_head_changed();
++	substrate_build_script_utils::generate_cargo_keys();
++	substrate_build_script_utils::rerun_if_git_head_changed();
+ }
+diff --git a/node/src/chain_spec.rs b/node/src/chain_spec.rs
+index a8e1732..091d0e8 100644
+--- a/node/src/chain_spec.rs
++++ b/node/src/chain_spec.rs
+@@ -1,19 +1,13 @@
+ use std::str::FromStr;
+ 
+ use academy_pow_runtime::{
+-    AccountId,
+-    SS58Prefix,
+-    Signature,
+-    TOKEN_DECIMALS,
+-    TOKEN_SYMBOL,
+-    WASM_BINARY,
++	AccountId, SS58Prefix, Signature, TOKEN_DECIMALS, TOKEN_SYMBOL, WASM_BINARY,
+ };
+ use multi_pow::{ForkHeights, ForkingConfig, MaxiPosition};
+ use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
+ use sc_service::ChainType;
+ use serde::{Deserialize, Serialize};
+-use sp_core::{sr25519, Pair, Public};
+-use sp_core::{ByteArray, H256};
++use sp_core::{sr25519, ByteArray, Pair, Public, H256};
+ use sp_runtime::traits::{IdentifyAccount, Verify};
+ 
+ /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
+@@ -27,58 +21,58 @@ pub type ChainSpec = sc_service::GenericChainSpec<ForkingExtensions>;
+ #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ChainSpecGroup, ChainSpecExtension)]
+ #[serde(deny_unknown_fields)]
+ pub struct ForkingExtensions {
+-    /// Manual mode is intended for when we you are running a live workshop.
+-    /// No forking happens automatically. Rather, you have to hard-code the forks.
+-    ///
+-    /// If manual mode is enabled, the rest of the parameters are ignored.
+-    /// This should really be an enum, but I have to work around the broken extension system.
+-    ///
+-    /// Aww damn it! I can't even use bool in this broken system? Okay then I guess 0 means automatic mode
+-    /// and anything else means manual mode.
+-    pub manual_mode: u32,
+-    /// The block height to perform the soft fork that adds sha3 and keccak support.
+-    pub add_sha3_keccak: u32,
+-    /// The block height to perform the hard fork that removes md5 support.
+-    pub remove_md5: u32,
+-    /// The block height to perform the contentious fork where some become sha3- or keccak-maxis.
+-    pub split_sha3_keccak: u32,
+-    // Damn extension thing is so fragile, I can't even use an enum here.
+-    // Let alone that time I tried to use the forked value feature.
+-    /// The political position that this node will take at the contentious fork.
+-    pub maxi_position: String,
++	/// Manual mode is intended for when we you are running a live workshop.
++	/// No forking happens automatically. Rather, you have to hard-code the forks.
++	///
++	/// If manual mode is enabled, the rest of the parameters are ignored.
++	/// This should really be an enum, but I have to work around the broken extension system.
++	///
++	/// Aww damn it! I can't even use bool in this broken system? Okay then I guess 0 means
++	/// automatic mode and anything else means manual mode.
++	pub manual_mode: u32,
++	/// The block height to perform the soft fork that adds sha3 and keccak support.
++	pub add_sha3_keccak: u32,
++	/// The block height to perform the hard fork that removes md5 support.
++	pub remove_md5: u32,
++	/// The block height to perform the contentious fork where some become sha3- or keccak-maxis.
++	pub split_sha3_keccak: u32,
++	// Damn extension thing is so fragile, I can't even use an enum here.
++	// Let alone that time I tried to use the forked value feature.
++	/// The political position that this node will take at the contentious fork.
++	pub maxi_position: String,
+ }
+ 
+ impl From<&ForkingExtensions> for ForkingConfig {
+-    fn from(e: &ForkingExtensions) -> Self {
+-        if e.manual_mode > 0 {
+-            return Self::Manual;
+-        }
+-
+-        let fork_heights = ForkHeights {
+-            add_sha3_keccak: e.add_sha3_keccak,
+-            remove_md5: e.remove_md5,
+-            split_sha3_keccak: e.split_sha3_keccak,
+-        };
+-
+-        let maxi_position =
+-            MaxiPosition::from_str(&e.maxi_position).expect("Should have a valid maxi position...");
+-
+-        Self::Automatic(fork_heights, maxi_position)
+-    }
++	fn from(e: &ForkingExtensions) -> Self {
++		if e.manual_mode > 0 {
++			return Self::Manual;
++		}
++
++		let fork_heights = ForkHeights {
++			add_sha3_keccak: e.add_sha3_keccak,
++			remove_md5: e.remove_md5,
++			split_sha3_keccak: e.split_sha3_keccak,
++		};
++
++		let maxi_position =
++			MaxiPosition::from_str(&e.maxi_position).expect("Should have a valid maxi position...");
++
++		Self::Automatic(fork_heights, maxi_position)
++	}
+ }
+ 
+ impl ForkingExtensions {
+-    /// Try to get the extension from the given `ChainSpec`.
+-    pub fn try_get(chain_spec: &dyn sc_service::ChainSpec) -> Option<&Self> {
+-        sc_chain_spec::get_extension(chain_spec.extensions())
+-    }
++	/// Try to get the extension from the given `ChainSpec`.
++	pub fn try_get(chain_spec: &dyn sc_service::ChainSpec) -> Option<&Self> {
++		sc_chain_spec::get_extension(chain_spec.extensions())
++	}
+ }
+ 
+ /// Generate a crypto pair from seed.
+ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
+-    TPublic::Pair::from_string(&format!("//{}", seed), None)
+-        .expect("static values are valid; qed")
+-        .public()
++	TPublic::Pair::from_string(&format!("//{}", seed), None)
++		.expect("static values are valid; qed")
++		.public()
+ }
+ 
+ type AccountPublic = <Signature as Verify>::Signer;
+@@ -86,103 +80,100 @@ type AccountPublic = <Signature as Verify>::Signer;
+ /// Generate an account ID from seed.
+ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
+ where
+-    AccountPublic: From<<TPublic::Pair as Pair>::Public>,
++	AccountPublic: From<<TPublic::Pair as Pair>::Public>,
+ {
+-    AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
++	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
+ }
+ 
+ pub fn development_config() -> Result<ChainSpec, String> {
+-    Ok(ChainSpec::builder(
+-        WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
+-        ForkingExtensions {
+-            manual_mode: 1, // change this to `0` if you want to try `auto_fork_validation`
+-            add_sha3_keccak: 10,
+-            remove_md5: 20,
+-            split_sha3_keccak: 30,
+-            maxi_position: String::from("follow-mining"),
+-        },
+-    )
+-    .with_name("Development")
+-    .with_id("dev")
+-    .with_chain_type(ChainType::Development)
+-    .with_genesis_config_patch(genesis(
+-        // Pre-funded accounts
+-        vec![
+-            get_account_id_from_seed::<sr25519::Public>("Alice"),
+-            get_account_id_from_seed::<sr25519::Public>("Bob"),
+-            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+-            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+-        ],
+-        // Initial Difficulty
+-        4_000_000,
+-    ))
+-    .with_properties(system_properties())
+-    .build())
++	Ok(ChainSpec::builder(
++		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
++		ForkingExtensions {
++			manual_mode: 1, // change this to `0` if you want to try `auto_fork_validation`
++			add_sha3_keccak: 10,
++			remove_md5: 20,
++			split_sha3_keccak: 30,
++			maxi_position: String::from("follow-mining"),
++		},
++	)
++	.with_name("Development")
++	.with_id("dev")
++	.with_chain_type(ChainType::Development)
++	.with_genesis_config_patch(genesis(
++		// Pre-funded accounts
++		vec![
++			get_account_id_from_seed::<sr25519::Public>("Alice"),
++			get_account_id_from_seed::<sr25519::Public>("Bob"),
++			get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
++			get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
++		],
++		// Initial Difficulty
++		4_000_000,
++	))
++	.with_properties(system_properties())
++	.build())
+ }
+ 
+ pub fn testnet_config() -> Result<ChainSpec, String> {
+-    Ok(ChainSpec::builder(
+-        WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
+-        ForkingExtensions {
+-            manual_mode: 1,
+-            add_sha3_keccak: 0,
+-            remove_md5: 0,
+-            split_sha3_keccak: 0,
+-            maxi_position: String::new(),
+-        },
+-    )
+-    .with_name("Testnet")
+-    .with_id("testnet")
+-    .with_chain_type(ChainType::Local)
+-    .with_genesis_config_patch(genesis(
+-        vec![
+-            get_account_id_from_seed::<sr25519::Public>("Alice"),
+-            get_account_id_from_seed::<sr25519::Public>("Bob"),
+-            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+-            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+-        ],
+-        4_000_000,
+-    ))
+-    .with_properties(system_properties())
+-    .build())
++	Ok(ChainSpec::builder(
++		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
++		ForkingExtensions {
++			manual_mode: 1,
++			add_sha3_keccak: 0,
++			remove_md5: 0,
++			split_sha3_keccak: 0,
++			maxi_position: String::new(),
++		},
++	)
++	.with_name("Testnet")
++	.with_id("testnet")
++	.with_chain_type(ChainType::Local)
++	.with_genesis_config_patch(genesis(
++		vec![
++			get_account_id_from_seed::<sr25519::Public>("Alice"),
++			get_account_id_from_seed::<sr25519::Public>("Bob"),
++			get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
++			get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
++		],
++		4_000_000,
++	))
++	.with_properties(system_properties())
++	.build())
+ }
+ 
+-fn genesis(
+-    endowed_accounts: Vec<AccountId>,
+-    initial_difficulty: u32,
+-) -> serde_json::Value {
+-    serde_json::json!({
+-        "balances": {
+-            // Configure endowed accounts with initial balance of 1 << 50.
+-            "balances": endowed_accounts.iter().cloned().map(|k| (k, 1u64 << 50)).collect::<Vec<_>>(),
+-        },
+-        "keccakDifficultyAdjustment": {
+-            "initialDifficulty": u32_to_u8_32(initial_difficulty),
+-        },
+-        "md5DifficultyAdjustment": {
+-            "initialDifficulty": u32_to_u8_32(initial_difficulty),
+-        },
+-        "sha3DifficultyAdjustment": {
+-            "initialDifficulty": u32_to_u8_32(initial_difficulty),
+-        },
+-    })
++fn genesis(endowed_accounts: Vec<AccountId>, initial_difficulty: u32) -> serde_json::Value {
++	serde_json::json!({
++		"balances": {
++			// Configure endowed accounts with initial balance of 1 << 50.
++			"balances": endowed_accounts.iter().cloned().map(|k| (k, 1u64 << 50)).collect::<Vec<_>>(),
++		},
++		"keccakDifficultyAdjustment": {
++			"initialDifficulty": u32_to_u8_32(initial_difficulty),
++		},
++		"md5DifficultyAdjustment": {
++			"initialDifficulty": u32_to_u8_32(initial_difficulty),
++		},
++		"sha3DifficultyAdjustment": {
++			"initialDifficulty": u32_to_u8_32(initial_difficulty),
++		},
++	})
+ }
+ 
+ /// Convert u32 (default value) to [u8;32] (U256)
+ /// in little-endian format
+ pub fn u32_to_u8_32(num: u32) -> [u8; 32] {
+-    let mut result = [0u8; 32];
+-    let bytes = num.to_le_bytes(); 
+-    result[..4].copy_from_slice(&bytes);
+-    result
++	let mut result = [0u8; 32];
++	let bytes = num.to_le_bytes();
++	result[..4].copy_from_slice(&bytes);
++	result
+ }
+ 
+ fn system_properties() -> sc_chain_spec::Properties {
+-    let mut properties = sc_chain_spec::Properties::new();
++	let mut properties = sc_chain_spec::Properties::new();
+ 
+-    properties.insert("ss58Format".into(), SS58Prefix::get().into());
+-    properties.insert("tokenSymbol".into(), TOKEN_SYMBOL.into());
+-    properties.insert("tokenDecimals".into(), TOKEN_DECIMALS.into());
++	properties.insert("ss58Format".into(), SS58Prefix::get().into());
++	properties.insert("tokenSymbol".into(), TOKEN_SYMBOL.into());
++	properties.insert("tokenDecimals".into(), TOKEN_DECIMALS.into());
+ 
+-    properties
++	properties
+ }
+diff --git a/node/src/cli.rs b/node/src/cli.rs
+index 4e1ac61..e7a62e5 100644
+--- a/node/src/cli.rs
++++ b/node/src/cli.rs
+@@ -1,8 +1,8 @@
+ use academy_pow_runtime::AccountId;
+ use multi_pow::SupportedHashes;
+ use sc_cli::{
+-    clap::{ArgGroup, Parser},
+-    RunCmd,
++	clap::{ArgGroup, Parser},
++	RunCmd,
+ };
+ use sc_service::ChainType;
+ use sp_core::{crypto::Ss58Codec, sr25519};
+@@ -10,139 +10,136 @@ use sp_core::{crypto::Ss58Codec, sr25519};
+ #[derive(Debug, Parser)]
+ #[clap(subcommand_negates_reqs(true), version(env!("SUBSTRATE_CLI_IMPL_VERSION")))]
+ pub struct Cli {
+-    #[clap(subcommand)]
+-    pub subcommand: Option<Subcommand>,
++	#[clap(subcommand)]
++	pub subcommand: Option<Subcommand>,
+ 
+-    #[command(flatten)]
+-    pub pow: AcademyPowCli,
++	#[command(flatten)]
++	pub pow: AcademyPowCli,
+ 
+-    #[clap(flatten)]
+-    pub run: RunCmd,
++	#[clap(flatten)]
++	pub run: RunCmd,
+ }
+ 
+ #[derive(Debug, Parser, Clone)]
+ #[clap(group(ArgGroup::new("backup")))]
+ pub struct AcademyPowCli {
+-    /// Miner's AccountId (base58 encoding of an SR25519 public key) for the block rewards
+-    #[clap(long,
++	/// Miner's AccountId (base58 encoding of an SR25519 public key) for the block rewards
++	#[clap(long,
+            conflicts_with = "mining_public_key",
+            value_parser = parse_account_id)]
+-    pub mining_account_id: Option<AccountId>,
++	pub mining_account_id: Option<AccountId>,
+ 
+-    /// Miner's hex encoding of the SR25519 public key) for the block rewards
+-    #[clap(
++	/// Miner's hex encoding of the SR25519 public key) for the block rewards
++	#[clap(
+         long,
+         conflicts_with = "mining_account_id",
+         value_parser = parse_sr25519_public_key
+     )]
+-    pub mining_public_key: Option<sr25519::Public>,
++	pub mining_public_key: Option<sr25519::Public>,
+ 
+-    /// The mining algorithm to use
+-    #[clap(long, value_parser = parse_algo, default_value = "md5")]
+-    pub mining_algo: multi_pow::SupportedHashes,
++	/// The mining algorithm to use
++	#[clap(long, value_parser = parse_algo, default_value = "md5")]
++	pub mining_algo: multi_pow::SupportedHashes,
+ 
+-    /// whether to use instant seal
+-    #[clap(long, default_value = "false")]
+-    pub instant_seal: bool,
++	/// whether to use instant seal
++	#[clap(long, default_value = "false")]
++	pub instant_seal: bool,
+ }
+ 
+ impl AcademyPowCli {
+-    pub fn public_key_bytes(&self, keyring: Option<sp_keyring::Sr25519Keyring>) -> [u8; 32] {
+-        match &self.mining_account_id {
+-            Some(account_id) => *account_id.as_ref(),
+-            None => match self.mining_public_key {
+-                Some(public_key) => public_key.0,
+-                None => keyring.map(|k| k.to_raw_public()).unwrap_or([0u8; 32]),
+-            },
+-        }
+-    }
++	pub fn public_key_bytes(&self, keyring: Option<sp_keyring::Sr25519Keyring>) -> [u8; 32] {
++		match &self.mining_account_id {
++			Some(account_id) => *account_id.as_ref(),
++			None => match self.mining_public_key {
++				Some(public_key) => public_key.0,
++				None => keyring.map(|k| k.to_raw_public()).unwrap_or([0u8; 32]),
++			},
++		}
++	}
+ }
+ 
+ #[derive(Debug, Parser)]
+ pub struct BuildSpecCmd {
+-    #[clap(flatten)]
+-    pub base: sc_cli::BuildSpecCmd,
++	#[clap(flatten)]
++	pub base: sc_cli::BuildSpecCmd,
+ 
+-    /// Chain name.
+-    #[arg(long, default_value = "Academy PoW")]
+-    pub chain_name: String,
++	/// Chain name.
++	#[arg(long, default_value = "Academy PoW")]
++	pub chain_name: String,
+ 
+-    /// Chain ID is a short identifier of the chain
+-    #[arg(long, value_name = "ID", default_value = "academy_pow")]
+-    pub chain_id: String,
++	/// Chain ID is a short identifier of the chain
++	#[arg(long, value_name = "ID", default_value = "academy_pow")]
++	pub chain_id: String,
+ 
+-    /// AccountIds of the optional rich accounts
+-    #[arg(long, value_delimiter = ',', value_parser = parse_account_id, num_args=1..)]
+-    pub endowed_accounts: Option<Vec<AccountId>>,
++	/// AccountIds of the optional rich accounts
++	#[arg(long, value_delimiter = ',', value_parser = parse_account_id, num_args=1..)]
++	pub endowed_accounts: Option<Vec<AccountId>>,
+ 
+-    /// The type of the chain. Possible values: "dev", "local", "live" (default)
+-    #[arg(long, value_name = "TYPE", value_parser = parse_chaintype, default_value = "live")]
+-    pub chain_type: ChainType,
++	/// The type of the chain. Possible values: "dev", "local", "live" (default)
++	#[arg(long, value_name = "TYPE", value_parser = parse_chaintype, default_value = "live")]
++	pub chain_type: ChainType,
+ 
+-    #[arg(long, default_value = "4000000")]
+-    pub initial_difficulty: u32,
++	#[arg(long, default_value = "4000000")]
++	pub initial_difficulty: u32,
+ }
+ 
+ fn parse_algo(s: &str) -> Result<SupportedHashes, String> {
+-    Ok(match s {
+-        "md" | "Md" | "md5" | "Md5" => SupportedHashes::Md5,
+-        "sha" | "sha3" | "Sha" | "Sha3" => SupportedHashes::Sha3,
+-        "keccak" | "Keccak" => SupportedHashes::Keccak,
+-        s => panic!(
+-            "Wrong mining algo: {}. Possible values: md5, sha3, keccak",
+-            s
+-        ),
+-    })
++	Ok(match s {
++		"md" | "Md" | "md5" | "Md5" => SupportedHashes::Md5,
++		"sha" | "sha3" | "Sha" | "Sha3" => SupportedHashes::Sha3,
++		"keccak" | "Keccak" => SupportedHashes::Keccak,
++		s => panic!("Wrong mining algo: {}. Possible values: md5, sha3, keccak", s),
++	})
+ }
+ 
+ fn parse_chaintype(s: &str) -> Result<ChainType, String> {
+-    Ok(match s {
+-        "dev" => ChainType::Development,
+-        "local" => ChainType::Local,
+-        "live" => ChainType::Live,
+-        s => panic!("Wrong chain type {} Possible values: dev local live", s),
+-    })
++	Ok(match s {
++		"dev" => ChainType::Development,
++		"local" => ChainType::Local,
++		"live" => ChainType::Live,
++		s => panic!("Wrong chain type {} Possible values: dev local live", s),
++	})
+ }
+ 
+ /// Parse AccountId from a string argument passed on the command line.
+ fn parse_account_id(s: &str) -> Result<AccountId, String> {
+-    Ok(AccountId::from_string(s)
+-        .expect("Passed string is not a bas58 encoding of a sr25519 public key"))
++	Ok(AccountId::from_string(s)
++		.expect("Passed string is not a bas58 encoding of a sr25519 public key"))
+ }
+ 
+ /// Parse sr25519 pubkey from a string argument passed on the command line.
+ fn parse_sr25519_public_key(s: &str) -> Result<sr25519::Public, String> {
+-    Ok(sr25519::Public::from_string(s)
+-        .expect("Passed string is not a hex encoding of a sr25519 public key"))
++	Ok(sr25519::Public::from_string(s)
++		.expect("Passed string is not a hex encoding of a sr25519 public key"))
+ }
+ 
+ #[derive(Debug, clap::Subcommand)]
+ pub enum Subcommand {
+-    /// Key management cli utilities
+-    #[command(subcommand)]
+-    Key(sc_cli::KeySubcommand),
++	/// Key management cli utilities
++	#[command(subcommand)]
++	Key(sc_cli::KeySubcommand),
+ 
+-    /// Build a chain specification.
+-    BuildSpec(BuildSpecCmd),
++	/// Build a chain specification.
++	BuildSpec(BuildSpecCmd),
+ 
+-    /// Validate blocks.
+-    CheckBlock(sc_cli::CheckBlockCmd),
++	/// Validate blocks.
++	CheckBlock(sc_cli::CheckBlockCmd),
+ 
+-    /// Export blocks.
+-    ExportBlocks(sc_cli::ExportBlocksCmd),
++	/// Export blocks.
++	ExportBlocks(sc_cli::ExportBlocksCmd),
+ 
+-    /// Export the state of a given block into a chain spec.
+-    ExportState(sc_cli::ExportStateCmd),
++	/// Export the state of a given block into a chain spec.
++	ExportState(sc_cli::ExportStateCmd),
+ 
+-    /// Import blocks.
+-    ImportBlocks(sc_cli::ImportBlocksCmd),
++	/// Import blocks.
++	ImportBlocks(sc_cli::ImportBlocksCmd),
+ 
+-    /// Remove the whole chain.
+-    PurgeChain(sc_cli::PurgeChainCmd),
++	/// Remove the whole chain.
++	PurgeChain(sc_cli::PurgeChainCmd),
+ 
+-    /// Revert the chain to a previous state.
+-    Revert(sc_cli::RevertCmd),
++	/// Revert the chain to a previous state.
++	Revert(sc_cli::RevertCmd),
+ 
+-    /// Db meta columns information.
+-    ChainInfo(sc_cli::ChainInfoCmd),
++	/// Db meta columns information.
++	ChainInfo(sc_cli::ChainInfoCmd),
+ }
+diff --git a/node/src/command.rs b/node/src/command.rs
+index b62bd98..18c5c54 100644
+--- a/node/src/command.rs
++++ b/node/src/command.rs
+@@ -21,163 +21,146 @@ use sc_service::PartialComponents;
+ use sp_core::sr25519;
+ 
+ use crate::{
+-    chain_spec::{self, ForkingExtensions},
+-    cli::{Cli, Subcommand},
+-    service,
++	chain_spec::{self, ForkingExtensions},
++	cli::{Cli, Subcommand},
++	service,
+ };
+ 
+ impl SubstrateCli for Cli {
+-    fn impl_name() -> String {
+-        "Academy PoW Chain".into()
+-    }
+-
+-    fn impl_version() -> String {
+-        env!("SUBSTRATE_CLI_IMPL_VERSION").into()
+-    }
+-
+-    fn executable_name() -> String {
+-        env!("CARGO_PKG_NAME").into()
+-    }
+-
+-    fn author() -> String {
+-        env!("CARGO_PKG_AUTHORS").into()
+-    }
+-
+-    fn description() -> String {
+-        env!("CARGO_PKG_DESCRIPTION").into()
+-    }
+-
+-    fn support_url() -> String {
+-        "https://github.com/danielbui12/substrate-bitcoin-like-blockchain/issues/new".into()
+-    }
+-
+-    fn copyright_start_year() -> i32 {
+-        2025
+-    }
+-
+-    fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
+-        Ok(match id {
+-            "" => Box::new(chain_spec::ChainSpec::from_json_bytes(
+-                &include_bytes!("../../spec.json")[..],
+-            )?),
+-            "dev" => Box::new(chain_spec::development_config()?),
+-            "local" => Box::new(chain_spec::testnet_config()?),
+-            path => Box::new(chain_spec::ChainSpec::from_json_file(
+-                std::path::PathBuf::from(path),
+-            )?),
+-        })
+-    }
++	fn impl_name() -> String {
++		"Academy PoW Chain".into()
++	}
++
++	fn impl_version() -> String {
++		env!("SUBSTRATE_CLI_IMPL_VERSION").into()
++	}
++
++	fn executable_name() -> String {
++		env!("CARGO_PKG_NAME").into()
++	}
++
++	fn author() -> String {
++		env!("CARGO_PKG_AUTHORS").into()
++	}
++
++	fn description() -> String {
++		env!("CARGO_PKG_DESCRIPTION").into()
++	}
++
++	fn support_url() -> String {
++		"https://github.com/danielbui12/substrate-bitcoin-like-blockchain/issues/new".into()
++	}
++
++	fn copyright_start_year() -> i32 {
++		2025
++	}
++
++	fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
++		Ok(match id {
++			"" => Box::new(chain_spec::ChainSpec::from_json_bytes(
++				&include_bytes!("../../spec.json")[..],
++			)?),
++			"dev" => Box::new(chain_spec::development_config()?),
++			"local" => Box::new(chain_spec::testnet_config()?),
++			path =>
++				Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?),
++		})
++	}
+ }
+ 
+ /// Parse and run command line arguments
+ pub fn run() -> sc_cli::Result<()> {
+-    let cli = Cli::from_args();
+-
+-    match &cli.subcommand {
+-        Some(Subcommand::Key(cmd)) => cmd.run(&cli),
+-        Some(Subcommand::BuildSpec(cmd)) => {
+-            let runner = cli.create_runner(&cmd.base)?;
+-            runner.sync_run(|config| cmd.base.run(config.chain_spec, config.network))
+-        }
+-        Some(Subcommand::CheckBlock(cmd)) => {
+-            let runner = cli.create_runner(cmd)?;
+-            runner.async_run(|config| {
+-                let PartialComponents {
+-                    client,
+-                    task_manager,
+-                    import_queue,
+-                    ..
+-                } = service::new_partial(&config, ForkingConfig::Manual)?;
+-                Ok((cmd.run(client, import_queue), task_manager))
+-            })
+-        }
+-        Some(Subcommand::ExportBlocks(cmd)) => {
+-            let runner = cli.create_runner(cmd)?;
+-            runner.async_run(|config| {
+-                let PartialComponents {
+-                    client,
+-                    task_manager,
+-                    ..
+-                } = service::new_partial(&config, ForkingConfig::Manual)?;
+-                Ok((cmd.run(client, config.database), task_manager))
+-            })
+-        }
+-        Some(Subcommand::ExportState(cmd)) => {
+-            let runner = cli.create_runner(cmd)?;
+-            runner.async_run(|config| {
+-                let PartialComponents {
+-                    client,
+-                    task_manager,
+-                    ..
+-                } = service::new_partial(&config, ForkingConfig::Manual)?;
+-                Ok((cmd.run(client, config.chain_spec), task_manager))
+-            })
+-        }
+-        Some(Subcommand::ImportBlocks(cmd)) => {
+-            let runner = cli.create_runner(cmd)?;
+-            runner.async_run(|config| {
+-                let PartialComponents {
+-                    client,
+-                    task_manager,
+-                    import_queue,
+-                    ..
+-                } = service::new_partial(&config, ForkingConfig::Manual)?;
+-                Ok((cmd.run(client, import_queue), task_manager))
+-            })
+-        }
+-        Some(Subcommand::PurgeChain(cmd)) => {
+-            let runner = cli.create_runner(cmd)?;
+-            runner.sync_run(|config| cmd.run(config.database))
+-        }
+-        Some(Subcommand::Revert(cmd)) => {
+-            let runner = cli.create_runner(cmd)?;
+-            runner.async_run(|config| {
+-                let PartialComponents {
+-                    client,
+-                    task_manager,
+-                    backend,
+-                    ..
+-                } = service::new_partial(&config, ForkingConfig::Manual)?;
+-                Ok((cmd.run(client, backend, None), task_manager))
+-            })
+-        }
+-        Some(Subcommand::ChainInfo(cmd)) => {
+-            let runner = cli.create_runner(cmd)?;
+-            runner.sync_run(|config| cmd.run::<Block>(&config))
+-        }
+-        None => {
+-            // Get the mining account from the cli
+-            let bytes: [u8; 32] = cli.pow.public_key_bytes(cli.run.get_keyring());
+-            let sr25519_public_key = sr25519::Public::from_raw(bytes);
+-
+-            let runner = cli.create_runner(&cli.run)?;
+-            runner.run_node_until_exit(|config| async move {
+-                // Get the forking information from the chain spec extension.
+-                // Convert it to a strong type, and fill in the proper maxi position if they are following mining.
+-                let forking_extension = ForkingExtensions::try_get(&*config.chain_spec)
+-                    .expect("Should be able to get the fork config from the extension");
+-                let forking_config = match ForkingConfig::from(forking_extension) {
+-                    ForkingConfig::Automatic(fork_heights, MaxiPosition::FollowMining) => {
+-                        let maxi_position = match cli.pow.mining_algo {
+-                            multi_pow::SupportedHashes::Md5 => MaxiPosition::NoMaxi,
+-                            multi_pow::SupportedHashes::Sha3 => MaxiPosition::Sha3Maxi,
+-                            multi_pow::SupportedHashes::Keccak => MaxiPosition::KeccakMaxi,
+-                        };
+-                        ForkingConfig::Automatic(fork_heights, maxi_position)
+-                    }
+-                    old_config => old_config,
+-                };
+-
+-                service::new_full::<sc_network::Litep2pNetworkBackend>(
+-                    config,
+-                    forking_config,
+-                    //TODO Combine the following three fields into a MiningConfig analogous to the ForkingConfig
+-                    sr25519_public_key,
+-                    cli.pow.instant_seal,
+-                    cli.pow.mining_algo,
+-                )
+-                .map_err(sc_cli::Error::Service)
+-            })
+-        }
+-    }
++	let cli = Cli::from_args();
++
++	match &cli.subcommand {
++		Some(Subcommand::Key(cmd)) => cmd.run(&cli),
++		Some(Subcommand::BuildSpec(cmd)) => {
++			let runner = cli.create_runner(&cmd.base)?;
++			runner.sync_run(|config| cmd.base.run(config.chain_spec, config.network))
++		},
++		Some(Subcommand::CheckBlock(cmd)) => {
++			let runner = cli.create_runner(cmd)?;
++			runner.async_run(|config| {
++				let PartialComponents { client, task_manager, import_queue, .. } =
++					service::new_partial(&config, ForkingConfig::Manual)?;
++				Ok((cmd.run(client, import_queue), task_manager))
++			})
++		},
++		Some(Subcommand::ExportBlocks(cmd)) => {
++			let runner = cli.create_runner(cmd)?;
++			runner.async_run(|config| {
++				let PartialComponents { client, task_manager, .. } =
++					service::new_partial(&config, ForkingConfig::Manual)?;
++				Ok((cmd.run(client, config.database), task_manager))
++			})
++		},
++		Some(Subcommand::ExportState(cmd)) => {
++			let runner = cli.create_runner(cmd)?;
++			runner.async_run(|config| {
++				let PartialComponents { client, task_manager, .. } =
++					service::new_partial(&config, ForkingConfig::Manual)?;
++				Ok((cmd.run(client, config.chain_spec), task_manager))
++			})
++		},
++		Some(Subcommand::ImportBlocks(cmd)) => {
++			let runner = cli.create_runner(cmd)?;
++			runner.async_run(|config| {
++				let PartialComponents { client, task_manager, import_queue, .. } =
++					service::new_partial(&config, ForkingConfig::Manual)?;
++				Ok((cmd.run(client, import_queue), task_manager))
++			})
++		},
++		Some(Subcommand::PurgeChain(cmd)) => {
++			let runner = cli.create_runner(cmd)?;
++			runner.sync_run(|config| cmd.run(config.database))
++		},
++		Some(Subcommand::Revert(cmd)) => {
++			let runner = cli.create_runner(cmd)?;
++			runner.async_run(|config| {
++				let PartialComponents { client, task_manager, backend, .. } =
++					service::new_partial(&config, ForkingConfig::Manual)?;
++				Ok((cmd.run(client, backend, None), task_manager))
++			})
++		},
++		Some(Subcommand::ChainInfo(cmd)) => {
++			let runner = cli.create_runner(cmd)?;
++			runner.sync_run(|config| cmd.run::<Block>(&config))
++		},
++		None => {
++			// Get the mining account from the cli
++			let bytes: [u8; 32] = cli.pow.public_key_bytes(cli.run.get_keyring());
++			let sr25519_public_key = sr25519::Public::from_raw(bytes);
++
++			let runner = cli.create_runner(&cli.run)?;
++			runner.run_node_until_exit(|config| async move {
++				// Get the forking information from the chain spec extension.
++				// Convert it to a strong type, and fill in the proper maxi position if they are
++				// following mining.
++				let forking_extension = ForkingExtensions::try_get(&*config.chain_spec)
++					.expect("Should be able to get the fork config from the extension");
++				let forking_config = match ForkingConfig::from(forking_extension) {
++					ForkingConfig::Automatic(fork_heights, MaxiPosition::FollowMining) => {
++						let maxi_position = match cli.pow.mining_algo {
++							multi_pow::SupportedHashes::Md5 => MaxiPosition::NoMaxi,
++							multi_pow::SupportedHashes::Sha3 => MaxiPosition::Sha3Maxi,
++							multi_pow::SupportedHashes::Keccak => MaxiPosition::KeccakMaxi,
++						};
++						ForkingConfig::Automatic(fork_heights, maxi_position)
++					},
++					old_config => old_config,
++				};
++
++				service::new_full::<sc_network::Litep2pNetworkBackend>(
++					config,
++					forking_config,
++					//TODO Combine the following three fields into a MiningConfig analogous to the
++					// ForkingConfig
++					sr25519_public_key,
++					cli.pow.instant_seal,
++					cli.pow.mining_algo,
++				)
++				.map_err(sc_cli::Error::Service)
++			})
++		},
++	}
+ }
+diff --git a/node/src/main.rs b/node/src/main.rs
+index a4182cd..4449d28 100644
+--- a/node/src/main.rs
++++ b/node/src/main.rs
+@@ -9,5 +9,5 @@ mod command;
+ mod rpc;
+ 
+ fn main() -> sc_cli::Result<()> {
+-    command::run()
++	command::run()
+ }
+diff --git a/node/src/rpc.rs b/node/src/rpc.rs
+index 875414c..c315565 100644
+--- a/node/src/rpc.rs
++++ b/node/src/rpc.rs
+@@ -17,39 +17,35 @@ use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
+ 
+ /// Full client dependencies.
+ pub struct FullDeps<C, P> {
+-    /// The client instance to use.
+-    pub client: Arc<C>,
+-    /// Transaction pool instance.
+-    pub pool: Arc<P>,
+-    /// Whether to deny unsafe calls
+-    pub deny_unsafe: DenyUnsafe,
++	/// The client instance to use.
++	pub client: Arc<C>,
++	/// Transaction pool instance.
++	pub pool: Arc<P>,
++	/// Whether to deny unsafe calls
++	pub deny_unsafe: DenyUnsafe,
+ }
+ 
+ /// Instantiate all full RPC extensions.
+ pub fn create_full<C, P>(
+-    deps: FullDeps<C, P>,
++	deps: FullDeps<C, P>,
+ ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
+ where
+-    C: ProvideRuntimeApi<Block>,
+-    C: HeaderBackend<Block> + HeaderMetadata<Block, Error = BlockChainError> + 'static,
+-    C: Send + Sync + 'static,
+-    C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
+-    C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
+-    C::Api: BlockBuilder<Block>,
+-    P: TransactionPool + 'static,
++	C: ProvideRuntimeApi<Block>,
++	C: HeaderBackend<Block> + HeaderMetadata<Block, Error = BlockChainError> + 'static,
++	C: Send + Sync + 'static,
++	C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
++	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
++	C::Api: BlockBuilder<Block>,
++	P: TransactionPool + 'static,
+ {
+-    use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
+-    use substrate_frame_rpc_system::{System, SystemApiServer};
++	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
++	use substrate_frame_rpc_system::{System, SystemApiServer};
+ 
+-    let mut module = RpcModule::new(());
+-    let FullDeps {
+-        client,
+-        pool,
+-        deny_unsafe,
+-    } = deps;
++	let mut module = RpcModule::new(());
++	let FullDeps { client, pool, deny_unsafe } = deps;
+ 
+-    module.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
+-    module.merge(TransactionPayment::new(client).into_rpc())?;
++	module.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
++	module.merge(TransactionPayment::new(client).into_rpc())?;
+ 
+-    Ok(module)
++	Ok(module)
+ }
+diff --git a/node/src/service.rs b/node/src/service.rs
+index 4bf3935..abf64b5 100644
+--- a/node/src/service.rs
++++ b/node/src/service.rs
+@@ -23,266 +23,261 @@ type BasicImportQueue = sc_consensus::DefaultImportQueue<Block>;
+ type BoxBlockImport = sc_consensus::BoxBlockImport<Block>;
+ 
+ pub type Service = PartialComponents<
+-    FullClient,
+-    FullBackend,
+-    FullSelectChain,
+-    BasicImportQueue,
+-    sc_transaction_pool::FullPool<Block, FullClient>,
+-    (BoxBlockImport, Option<Telemetry>),
++	FullClient,
++	FullBackend,
++	FullSelectChain,
++	BasicImportQueue,
++	sc_transaction_pool::FullPool<Block, FullClient>,
++	(BoxBlockImport, Option<Telemetry>),
+ >;
+ 
+ /// Returns most parts of a service. Not enough to run a full chain,
+ /// But enough to perform chain operations like purge-chain
+ #[allow(clippy::type_complexity)]
+ pub fn new_partial(
+-    config: &Configuration,
+-    fork_config: ForkingConfig,
++	config: &Configuration,
++	fork_config: ForkingConfig,
+ ) -> Result<Service, ServiceError> {
+-    let telemetry = config
+-        .telemetry_endpoints
+-        .clone()
+-        .filter(|x| !x.is_empty())
+-        .map(|endpoints| -> Result<_, sc_telemetry::Error> {
+-            let worker = TelemetryWorker::new(16)?;
+-            let telemetry = worker.handle().new_telemetry(endpoints);
+-            Ok((worker, telemetry))
+-        })
+-        .transpose()?;
++	let telemetry = config
++		.telemetry_endpoints
++		.clone()
++		.filter(|x| !x.is_empty())
++		.map(|endpoints| -> Result<_, sc_telemetry::Error> {
++			let worker = TelemetryWorker::new(16)?;
++			let telemetry = worker.handle().new_telemetry(endpoints);
++			Ok((worker, telemetry))
++		})
++		.transpose()?;
+ 
+-    let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(config);
+-    let (client, backend, keystore_container, task_manager) =
+-        sc_service::new_full_parts::<Block, RuntimeApi, _>(
+-            config,
+-            telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
+-            executor,
+-        )?;
+-    let client = Arc::new(client);
++	let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(config);
++	let (client, backend, keystore_container, task_manager) =
++		sc_service::new_full_parts::<Block, RuntimeApi, _>(
++			config,
++			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
++			executor,
++		)?;
++	let client = Arc::new(client);
+ 
+-    let telemetry = telemetry.map(|(worker, telemetry)| {
+-        task_manager
+-            .spawn_handle()
+-            .spawn("telemetry", None, worker.run());
+-        telemetry
+-    });
++	let telemetry = telemetry.map(|(worker, telemetry)| {
++		task_manager.spawn_handle().spawn("telemetry", None, worker.run());
++		telemetry
++	});
+ 
+-    let select_chain = LongestChain::new(backend.clone());
++	let select_chain = LongestChain::new(backend.clone());
+ 
+-    let transaction_pool = sc_transaction_pool::BasicPool::new_full(
+-        config.transaction_pool.clone(),
+-        config.role.is_authority().into(),
+-        config.prometheus_registry(),
+-        task_manager.spawn_essential_handle(),
+-        client.clone(),
+-    );
++	let transaction_pool = sc_transaction_pool::BasicPool::new_full(
++		config.transaction_pool.clone(),
++		config.role.is_authority().into(),
++		config.prometheus_registry(),
++		task_manager.spawn_essential_handle(),
++		client.clone(),
++	);
+ 
+-    let block_import = sc_consensus_pow::PowBlockImport::new(
+-        client.clone(),
+-        client.clone(),
+-        MultiPow::new(client.clone(), fork_config),
+-        0, // check inherents starting at block 0
+-        select_chain.clone(),
+-        move |_, ()| async move {
+-            let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
++	let block_import = sc_consensus_pow::PowBlockImport::new(
++		client.clone(),
++		client.clone(),
++		MultiPow::new(client.clone(), fork_config),
++		0, // check inherents starting at block 0
++		select_chain.clone(),
++		move |_, ()| async move {
++			let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
+ 
+-            // We don't need the current mining key to check inherents, so we just use a default.
+-            // TODO, I don't think we need to do any checking here at all, right?
+-            // So can I just remove the author entirely?
+-            let author =
+-                academy_pow_runtime::block_author::InherentDataProvider(Default::default());
++			// We don't need the current mining key to check inherents, so we just use a default.
++			// TODO, I don't think we need to do any checking here at all, right?
++			// So can I just remove the author entirely?
++			let author =
++				academy_pow_runtime::block_author::InherentDataProvider(Default::default());
+ 
+-            Ok((timestamp, author))
+-        },
+-    );
++			Ok((timestamp, author))
++		},
++	);
+ 
+-    let import_queue = sc_consensus_pow::import_queue(
+-        Box::new(block_import.clone()),
+-        None,
+-        MultiPow::new(client.clone(), fork_config),
+-        &task_manager.spawn_essential_handle(),
+-        config.prometheus_registry(),
+-    )?;
++	let import_queue = sc_consensus_pow::import_queue(
++		Box::new(block_import.clone()),
++		None,
++		MultiPow::new(client.clone(), fork_config),
++		&task_manager.spawn_essential_handle(),
++		config.prometheus_registry(),
++	)?;
+ 
+-    Ok(PartialComponents {
+-        client,
+-        backend,
+-        task_manager,
+-        import_queue,
+-        keystore_container,
+-        select_chain,
+-        transaction_pool,
+-        other: (Box::new(block_import), telemetry),
+-    })
++	Ok(PartialComponents {
++		client,
++		backend,
++		task_manager,
++		import_queue,
++		keystore_container,
++		select_chain,
++		transaction_pool,
++		other: (Box::new(block_import), telemetry),
++	})
+ }
+ 
+ /// Builds a new service for a full client.
+ pub fn new_full<
+-    N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
++	N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
+ >(
+-    config: Configuration,
+-    fork_config: ForkingConfig,
+-    sr25519_public_key: sr25519::Public,
+-    instant_seal: bool,
+-    mining_algo: SupportedHashes,
++	config: Configuration,
++	fork_config: ForkingConfig,
++	sr25519_public_key: sr25519::Public,
++	instant_seal: bool,
++	mining_algo: SupportedHashes,
+ ) -> Result<TaskManager, ServiceError> {
+-    let sc_service::PartialComponents {
+-        client,
+-        backend,
+-        mut task_manager,
+-        import_queue,
+-        keystore_container,
+-        select_chain,
+-        transaction_pool,
+-        other: (pow_block_import, mut telemetry),
+-    } = new_partial(&config, fork_config)?;
++	let sc_service::PartialComponents {
++		client,
++		backend,
++		mut task_manager,
++		import_queue,
++		keystore_container,
++		select_chain,
++		transaction_pool,
++		other: (pow_block_import, mut telemetry),
++	} = new_partial(&config, fork_config)?;
+ 
+-    let net_config = sc_network::config::FullNetworkConfiguration::<
+-        Block,
+-        <Block as sp_runtime::traits::Block>::Hash,
+-        N,
+-    >::new(&config.network);
++	let net_config = sc_network::config::FullNetworkConfiguration::<
++		Block,
++		<Block as sp_runtime::traits::Block>::Hash,
++		N,
++	>::new(&config.network);
+ 	let metrics = sc_network::NotificationMetrics::new(None);
+ 
+-    let (network, system_rpc_tx, tx_handler_controller, network_starter, sync_service) =
+-        sc_service::build_network(sc_service::BuildNetworkParams {
+-            config: &config,
+-            net_config,
+-            client: client.clone(),
+-            transaction_pool: transaction_pool.clone(),
+-            spawn_handle: task_manager.spawn_handle(),
+-            import_queue,
+-            block_announce_validator_builder: None,
+-            warp_sync_params: None,
+-            block_relay: None,
+-            metrics: metrics,
+-        })?;
++	let (network, system_rpc_tx, tx_handler_controller, network_starter, sync_service) =
++		sc_service::build_network(sc_service::BuildNetworkParams {
++			config: &config,
++			net_config,
++			client: client.clone(),
++			transaction_pool: transaction_pool.clone(),
++			spawn_handle: task_manager.spawn_handle(),
++			import_queue,
++			block_announce_validator_builder: None,
++			warp_sync_params: None,
++			block_relay: None,
++			metrics,
++		})?;
+ 
+-    let role = config.role.clone();
+-    let prometheus_registry = config.prometheus_registry().cloned();
++	let role = config.role.clone();
++	let prometheus_registry = config.prometheus_registry().cloned();
+ 
+-    let rpc_extensions_builder = {
+-        let client = client.clone();
+-        let pool = transaction_pool.clone();
++	let rpc_extensions_builder = {
++		let client = client.clone();
++		let pool = transaction_pool.clone();
+ 
+-        Box::new(move |deny_unsafe, _| {
+-            let deps = crate::rpc::FullDeps {
+-                client: client.clone(),
+-                pool: pool.clone(),
+-                deny_unsafe,
+-            };
+-            crate::rpc::create_full(deps).map_err(Into::into)
+-        })
+-    };
++		Box::new(move |deny_unsafe, _| {
++			let deps =
++				crate::rpc::FullDeps { client: client.clone(), pool: pool.clone(), deny_unsafe };
++			crate::rpc::create_full(deps).map_err(Into::into)
++		})
++	};
+ 
+-    sc_service::spawn_tasks(sc_service::SpawnTasksParams {
+-        network,
+-        client: client.clone(),
+-        keystore: keystore_container.keystore(),
+-        task_manager: &mut task_manager,
+-        transaction_pool: transaction_pool.clone(),
+-        rpc_builder: rpc_extensions_builder,
+-        backend,
+-        system_rpc_tx,
+-        tx_handler_controller,
+-        sync_service: sync_service.clone(),
+-        config,
+-        telemetry: telemetry.as_mut(),
+-    })?;
++	sc_service::spawn_tasks(sc_service::SpawnTasksParams {
++		network,
++		client: client.clone(),
++		keystore: keystore_container.keystore(),
++		task_manager: &mut task_manager,
++		transaction_pool: transaction_pool.clone(),
++		rpc_builder: rpc_extensions_builder,
++		backend,
++		system_rpc_tx,
++		tx_handler_controller,
++		sync_service: sync_service.clone(),
++		config,
++		telemetry: telemetry.as_mut(),
++	})?;
+ 
+-    if role.is_authority() {
+-        let proposer = sc_basic_authorship::ProposerFactory::new(
+-            task_manager.spawn_handle(),
+-            client.clone(),
+-            transaction_pool.clone(),
+-            prometheus_registry.as_ref(),
+-            telemetry.as_ref().map(|x| x.handle()),
+-        );
++	if role.is_authority() {
++		let proposer = sc_basic_authorship::ProposerFactory::new(
++			task_manager.spawn_handle(),
++			client.clone(),
++			transaction_pool.clone(),
++			prometheus_registry.as_ref(),
++			telemetry.as_ref().map(|x| x.handle()),
++		);
+ 
+-        // If instant seal is requested, we just start it. Otherwise, we do the full PoW setup.
+-        if instant_seal {
+-            let params = sc_consensus_manual_seal::InstantSealParams {
+-                block_import: client.clone(),
+-                env: proposer,
+-                client,
+-                pool: transaction_pool,
+-                select_chain,
+-                consensus_data_provider: None,
+-                create_inherent_data_providers: move |_, ()| async move {
+-                    Ok(sp_timestamp::InherentDataProvider::from_system_time())
+-                },
+-            };
++		// If instant seal is requested, we just start it. Otherwise, we do the full PoW setup.
++		if instant_seal {
++			let params = sc_consensus_manual_seal::InstantSealParams {
++				block_import: client.clone(),
++				env: proposer,
++				client,
++				pool: transaction_pool,
++				select_chain,
++				consensus_data_provider: None,
++				create_inherent_data_providers: move |_, ()| async move {
++					Ok(sp_timestamp::InherentDataProvider::from_system_time())
++				},
++			};
+ 
+-            let authorship_future = sc_consensus_manual_seal::run_instant_seal(params);
++			let authorship_future = sc_consensus_manual_seal::run_instant_seal(params);
+ 
+-            task_manager.spawn_essential_handle().spawn_blocking(
+-                "instant-seal",
+-                None,
+-                authorship_future,
+-            );
+-        } else {
+-            let (mining_worker, mining_worker_task) = sc_consensus_pow::start_mining_worker(
+-                Box::new(pow_block_import),
+-                client.clone(),
+-                select_chain,
+-                MultiPow::new(client, fork_config),
+-                proposer,
+-                sync_service.clone(),
+-                sync_service,
+-                // Note the mining algorithm in the pre-runtime digest.
+-                // This allows us to know which algo it was in the runtime.
+-                // TODO This also makes it possible to remove the algo info from
+-                // the seal.
+-                Some(PreDigest::from((sr25519_public_key.into(), mining_algo)).encode()),
+-                // This code is copied from above. Would be better to not repeat it.
+-                move |_, ()| async move {
+-                    let timestamp = sp_timestamp::InherentDataProvider::from_system_time();            
+-                    // set default `author` following miner specified in CLI
+-                    let author = academy_pow_runtime::block_author::InherentDataProvider(
+-                        sr25519_public_key.encode(),
+-                    );
++			task_manager.spawn_essential_handle().spawn_blocking(
++				"instant-seal",
++				None,
++				authorship_future,
++			);
++		} else {
++			let (mining_worker, mining_worker_task) = sc_consensus_pow::start_mining_worker(
++				Box::new(pow_block_import),
++				client.clone(),
++				select_chain,
++				MultiPow::new(client, fork_config),
++				proposer,
++				sync_service.clone(),
++				sync_service,
++				// Note the mining algorithm in the pre-runtime digest.
++				// This allows us to know which algo it was in the runtime.
++				// TODO This also makes it possible to remove the algo info from
++				// the seal.
++				Some(PreDigest::from((sr25519_public_key.into(), mining_algo)).encode()),
++				// This code is copied from above. Would be better to not repeat it.
++				move |_, ()| async move {
++					let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
++					// set default `author` following miner specified in CLI
++					let author = academy_pow_runtime::block_author::InherentDataProvider(
++						sr25519_public_key.encode(),
++					);
+ 
+-                    Ok((timestamp, author))
+-                },
+-                std::time::Duration::from_secs(10),
+-                std::time::Duration::from_secs(5),
+-            );
++					Ok((timestamp, author))
++				},
++				std::time::Duration::from_secs(10),
++				std::time::Duration::from_secs(5),
++			);
+ 
+-            task_manager.spawn_essential_handle().spawn_blocking(
+-                "pow-miner",
+-                Some("pow-mining"),
+-                mining_worker_task,
+-            );
++			task_manager.spawn_essential_handle().spawn_blocking(
++				"pow-miner",
++				Some("pow-mining"),
++				mining_worker_task,
++			);
+ 
+-            // Start Mining worker.
+-            //TODO Some of this should move into the multi_pow crate.
+-            use multi_pow::{multi_hash_meets_difficulty, Compute};
+-            use sp_core::U256;
+-            let mut nonce: U256 = U256::from(0);
+-            std::thread::spawn(move || loop {
+-                let worker = mining_worker.clone();
+-                let metadata = worker.metadata();
+-                if let Some(metadata) = metadata {
+-                    let compute = Compute {
+-                        difficulty: metadata.difficulty,
+-                        pre_hash: metadata.pre_hash,
+-                        nonce,
+-                    };
+-                    let seal = compute.compute(mining_algo);
+-                    if multi_hash_meets_difficulty(&seal.work, seal.difficulty) {
+-                        nonce = U256::from(0);
+-                        let _ = futures::executor::block_on(worker.submit(seal.encode()));
+-                    } else {
+-                        nonce = nonce.saturating_add(U256::from(1));
+-                        if nonce == U256::MAX {
+-                            nonce = U256::from(0);
+-                        }
+-                    }
+-                } else {
+-                    std::thread::sleep(std::time::Duration::from_secs(1));
+-                }
+-            });
+-        }
+-    }
++			// Start Mining worker.
++			//TODO Some of this should move into the multi_pow crate.
++			use multi_pow::{multi_hash_meets_difficulty, Compute};
++			use sp_core::U256;
++			let mut nonce: U256 = U256::from(0);
++			std::thread::spawn(move || loop {
++				let worker = mining_worker.clone();
++				let metadata = worker.metadata();
++				if let Some(metadata) = metadata {
++					let compute = Compute {
++						difficulty: metadata.difficulty,
++						pre_hash: metadata.pre_hash,
++						nonce,
++					};
++					let seal = compute.compute(mining_algo);
++					if multi_hash_meets_difficulty(&seal.work, seal.difficulty) {
++						nonce = U256::from(0);
++						let _ = futures::executor::block_on(worker.submit(seal.encode()));
++					} else {
++						nonce = nonce.saturating_add(U256::from(1));
++						if nonce == U256::MAX {
++							nonce = U256::from(0);
++						}
++					}
++				} else {
++					std::thread::sleep(std::time::Duration::from_secs(1));
++				}
++			});
++		}
++	}
+ 
+-    network_starter.start_network();
+-    Ok(task_manager)
++	network_starter.start_network();
++	Ok(task_manager)
+ }
+diff --git a/runtime/build.rs b/runtime/build.rs
+index 6db3d90..9029164 100644
+--- a/runtime/build.rs
++++ b/runtime/build.rs
+@@ -1,8 +1,8 @@
+ fn main() {
+-    #[cfg(feature = "std")]
+-    substrate_wasm_builder::WasmBuilder::new()
+-        .with_current_project()
+-        .export_heap_base()
+-        .import_memory()
+-        .build()
++	#[cfg(feature = "std")]
++	substrate_wasm_builder::WasmBuilder::new()
++		.with_current_project()
++		.export_heap_base()
++		.import_memory()
++		.build()
+ }
+diff --git a/runtime/src/block_author.rs b/runtime/src/block_author.rs
+index b147eeb..156e630 100644
+--- a/runtime/src/block_author.rs
++++ b/runtime/src/block_author.rs
+@@ -14,142 +14,142 @@ use sp_std::vec::Vec;
+ 
+ #[frame_support::pallet(dev_mode)]
+ pub mod pallet {
+-    use frame_support::pallet_prelude::*;
+-    use frame_system::pallet_prelude::*;
+-
+-    use super::*;
+-
+-    /// The BlockAuthor Inherent pallet.
+-    #[pallet::pallet]
+-    pub struct Pallet<T>(PhantomData<T>);
+-    /// The pallet's configuration trait. Nothing to configure.
+-    #[pallet::config]
+-    pub trait Config: frame_system::Config {
+-        fn on_author_set(_author_account: Self::AccountId) {}
+-    }
+-
+-    #[pallet::error]
+-    pub enum Error<T> {
+-        /// Author already set in block.
+-        AuthorAlreadySet,
+-    }
+-
+-    /// Author of current block.
+-    #[pallet::storage]
+-    pub type Author<T: Config> = StorageValue<_, sr25519::Public, OptionQuery>;
+-
+-    #[pallet::call]
+-    impl<T: Config> Pallet<T>
+-    where
+-        <T as frame_system::Config>::AccountId: From<sp_core::sr25519::Public>,
+-    {
+-        /// Inherent to set the author of a block
+-        #[pallet::weight(1_000_000)]
+-        pub fn set_author(origin: OriginFor<T>, author: sr25519::Public) -> DispatchResult {
+-            ensure_none(origin)?;
+-            ensure!(Author::<T>::get().is_none(), Error::<T>::AuthorAlreadySet);
+-
+-            // Store the author in case other pallets want to fetch it and to let
+-            // offchain tools inspect it
+-            Author::<T>::put(author);
+-
+-            // Call the hook
+-            T::on_author_set(author.into());
+-
+-            Ok(())
+-        }
+-    }
+-
+-    #[pallet::hooks]
+-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+-        fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
+-            // Reset the author to None at the beginning of the block
+-            Author::<T>::kill();
+-
+-            // Return zero weight because we are not using weight-based
+-            // transaction fees.
+-            Weight::zero()
+-        }
+-    }
+-
+-    #[pallet::inherent]
+-    impl<T: Config> ProvideInherent for Pallet<T>
+-    where
+-        <T as frame_system::Config>::AccountId: From<sp_core::sr25519::Public>,
+-    {
+-        type Call = Call<T>;
+-        type Error = InherentError;
+-        const INHERENT_IDENTIFIER: InherentIdentifier = INHERENT_IDENTIFIER;
+-
+-        fn is_inherent_required(_: &InherentData) -> Result<Option<Self::Error>, Self::Error> {
+-            // Return Ok(Some(_)) unconditionally because this inherent is required in every block
+-            // If it is not found, throw an AuthorInherentRequired error.
+-            Ok(Some(InherentError::Other(
+-                sp_runtime::RuntimeString::Borrowed("BlockAuthorInherentRequired"),
+-            )))
+-        }
+-
+-        fn create_inherent(data: &InherentData) -> Option<Self::Call> {
+-            // Grab the Vec<u8> labelled with "author_" from the map of all inherent data
+-            let author_raw = data
+-                .get_data::<InherentType>(&INHERENT_IDENTIFIER)
+-                .expect("Gets and decodes authorship inherent data")?;
+-
+-            // Decode the Vec<u8> into an actual author
+-            let author = sr25519::Public::decode(&mut &author_raw[..])
+-                .expect("Decodes author raw inherent data");
+-
+-            Some(Call::set_author { author })
+-        }
+-
+-        fn is_inherent(call: &Self::Call) -> bool {
+-            matches!(call, Call::set_author { .. })
+-        }
+-    }
++	use frame_support::pallet_prelude::*;
++	use frame_system::pallet_prelude::*;
++
++	use super::*;
++
++	/// The BlockAuthor Inherent pallet.
++	#[pallet::pallet]
++	pub struct Pallet<T>(PhantomData<T>);
++	/// The pallet's configuration trait. Nothing to configure.
++	#[pallet::config]
++	pub trait Config: frame_system::Config {
++		fn on_author_set(_author_account: Self::AccountId) {}
++	}
++
++	#[pallet::error]
++	pub enum Error<T> {
++		/// Author already set in block.
++		AuthorAlreadySet,
++	}
++
++	/// Author of current block.
++	#[pallet::storage]
++	pub type Author<T: Config> = StorageValue<_, sr25519::Public, OptionQuery>;
++
++	#[pallet::call]
++	impl<T: Config> Pallet<T>
++	where
++		<T as frame_system::Config>::AccountId: From<sp_core::sr25519::Public>,
++	{
++		/// Inherent to set the author of a block
++		#[pallet::weight(1_000_000)]
++		pub fn set_author(origin: OriginFor<T>, author: sr25519::Public) -> DispatchResult {
++			ensure_none(origin)?;
++			ensure!(Author::<T>::get().is_none(), Error::<T>::AuthorAlreadySet);
++
++			// Store the author in case other pallets want to fetch it and to let
++			// offchain tools inspect it
++			Author::<T>::put(author);
++
++			// Call the hook
++			T::on_author_set(author.into());
++
++			Ok(())
++		}
++	}
++
++	#[pallet::hooks]
++	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
++		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
++			// Reset the author to None at the beginning of the block
++			Author::<T>::kill();
++
++			// Return zero weight because we are not using weight-based
++			// transaction fees.
++			Weight::zero()
++		}
++	}
++
++	#[pallet::inherent]
++	impl<T: Config> ProvideInherent for Pallet<T>
++	where
++		<T as frame_system::Config>::AccountId: From<sp_core::sr25519::Public>,
++	{
++		type Call = Call<T>;
++		type Error = InherentError;
++		const INHERENT_IDENTIFIER: InherentIdentifier = INHERENT_IDENTIFIER;
++
++		fn is_inherent_required(_: &InherentData) -> Result<Option<Self::Error>, Self::Error> {
++			// Return Ok(Some(_)) unconditionally because this inherent is required in every block
++			// If it is not found, throw an AuthorInherentRequired error.
++			Ok(Some(InherentError::Other(sp_runtime::RuntimeString::Borrowed(
++				"BlockAuthorInherentRequired",
++			))))
++		}
++
++		fn create_inherent(data: &InherentData) -> Option<Self::Call> {
++			// Grab the Vec<u8> labelled with "author_" from the map of all inherent data
++			let author_raw = data
++				.get_data::<InherentType>(&INHERENT_IDENTIFIER)
++				.expect("Gets and decodes authorship inherent data")?;
++
++			// Decode the Vec<u8> into an actual author
++			let author = sr25519::Public::decode(&mut &author_raw[..])
++				.expect("Decodes author raw inherent data");
++
++			Some(Call::set_author { author })
++		}
++
++		fn is_inherent(call: &Self::Call) -> bool {
++			matches!(call, Call::set_author { .. })
++		}
++	}
+ }
+ 
+ /// A trait to find the author (miner) of the block.
+ pub trait BlockAuthor {
+-    fn block_author() -> Option<sr25519::Public>;
++	fn block_author() -> Option<sr25519::Public>;
+ }
+ 
+ impl BlockAuthor for () {
+-    fn block_author() -> Option<sr25519::Public> {
+-        None
+-    }
++	fn block_author() -> Option<sr25519::Public> {
++		None
++	}
+ }
+ 
+ impl<T: Config> BlockAuthor for Pallet<T> {
+-    fn block_author() -> Option<sr25519::Public> {
+-        Author::<T>::get()
+-    }
++	fn block_author() -> Option<sr25519::Public> {
++		Author::<T>::get()
++	}
+ }
+ 
+ pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"author__";
+ 
+ #[derive(Encode, Decode, Debug)]
+ pub enum InherentError {
+-    Other(RuntimeString),
++	Other(RuntimeString),
+ }
+ 
+ impl IsFatalError for InherentError {
+-    fn is_fatal_error(&self) -> bool {
+-        match *self {
+-            InherentError::Other(_) => true,
+-        }
+-    }
++	fn is_fatal_error(&self) -> bool {
++		match *self {
++			InherentError::Other(_) => true,
++		}
++	}
+ }
+ 
+ impl InherentError {
+-    /// Try to create an instance ouf of the given identifier and data.
+-    #[cfg(feature = "std")]
+-    pub fn try_from(id: &InherentIdentifier, data: &[u8]) -> Option<Self> {
+-        if id == &INHERENT_IDENTIFIER {
+-            <InherentError as parity_scale_codec::Decode>::decode(&mut &data[..]).ok()
+-        } else {
+-            None
+-        }
+-    }
++	/// Try to create an instance ouf of the given identifier and data.
++	#[cfg(feature = "std")]
++	pub fn try_from(id: &InherentIdentifier, data: &[u8]) -> Option<Self> {
++		if id == &INHERENT_IDENTIFIER {
++			<InherentError as parity_scale_codec::Decode>::decode(&mut &data[..]).ok()
++		} else {
++			None
++		}
++	}
+ }
+ 
+ /// The type of data that the inherent will contain.
+@@ -162,26 +162,26 @@ pub struct InherentDataProvider(pub InherentType);
+ #[cfg(feature = "std")]
+ #[async_trait::async_trait]
+ impl sp_inherents::InherentDataProvider for InherentDataProvider {
+-    async fn provide_inherent_data(
+-        &self,
+-        inherent_data: &mut InherentData,
+-    ) -> Result<(), sp_inherents::Error> {
+-        inherent_data.put_data(INHERENT_IDENTIFIER, &self.0)
+-    }
+-
+-    async fn try_handle_error(
+-        &self,
+-        identifier: &InherentIdentifier,
+-        _error: &[u8],
+-    ) -> Option<Result<(), sp_inherents::Error>> {
+-        // Dont' process modules from other inherents
+-        if *identifier != INHERENT_IDENTIFIER {
+-            return None;
+-        }
+-
+-        // All errors with the author inehrent are fatal
+-        Some(Err(sp_inherents::Error::Application(Box::from(
+-            String::from("Error processing author inherent"),
+-        ))))
+-    }
++	async fn provide_inherent_data(
++		&self,
++		inherent_data: &mut InherentData,
++	) -> Result<(), sp_inherents::Error> {
++		inherent_data.put_data(INHERENT_IDENTIFIER, &self.0)
++	}
++
++	async fn try_handle_error(
++		&self,
++		identifier: &InherentIdentifier,
++		_error: &[u8],
++	) -> Option<Result<(), sp_inherents::Error>> {
++		// Dont' process modules from other inherents
++		if *identifier != INHERENT_IDENTIFIER {
++			return None;
++		}
++
++		// All errors with the author inehrent are fatal
++		Some(Err(sp_inherents::Error::Application(Box::from(String::from(
++			"Error processing author inherent",
++		)))))
++	}
+ }
+diff --git a/runtime/src/difficulty.rs b/runtime/src/difficulty.rs
+index babfeab..650d77a 100644
+--- a/runtime/src/difficulty.rs
++++ b/runtime/src/difficulty.rs
+@@ -15,18 +15,18 @@ use sp_runtime::traits::UniqueSaturatedInto;
+ 
+ #[derive(Encode, Decode, Clone, Copy, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
+ pub struct DifficultyAndTimestamp<M> {
+-    pub difficulty: Difficulty,
+-    pub timestamp: M,
++	pub difficulty: Difficulty,
++	pub timestamp: M,
+ }
+ 
+ /// Move value linearly toward a goal
+ pub fn damp(actual: u128, goal: u128, damp_factor: u128) -> u128 {
+-    (actual + (damp_factor - 1) * goal) / damp_factor
++	(actual + (damp_factor - 1) * goal) / damp_factor
+ }
+ 
+ /// Limit value to be within some factor from a goal
+ pub fn clamp(actual: u128, goal: u128, clamp_factor: u128) -> u128 {
+-    max(goal / clamp_factor, min(actual, goal * clamp_factor))
++	max(goal / clamp_factor, min(actual, goal * clamp_factor))
+ }
+ 
+ const DIFFICULTY_ADJUST_WINDOW: u128 = 60;
+@@ -36,168 +36,166 @@ pub use pallet::*;
+ 
+ #[frame_support::pallet(dev_mode)]
+ pub mod pallet {
+-    use frame_support::pallet_prelude::*;
+-    use frame_system::pallet_prelude::*;
+-
+-    use super::*;
+-
+-    /// Pallet's configuration trait.
+-    #[pallet::config]
+-    pub trait Config<I: 'static = ()>: frame_system::Config {
+-        /// A Source for timestamp data
+-        type TimeProvider: Time;
+-        /// The block time that the DAA will attempt to maintain
+-        type TargetBlockTime: Get<u128>;
+-        /// Dampening factor to use for difficulty adjustment
+-        type DampFactor: Get<u128>;
+-        /// Clamp factor to use for difficulty adjustment
+-        /// Limit value to within this factor of goal. Recommended value: 2
+-        type ClampFactor: Get<u128>;
+-        /// The maximum difficulty allowed. Recommended to use u128::max_value()
+-        type MaxDifficulty: Get<u128>;
+-        /// Minimum difficulty, enforced in difficulty retargetting
+-        /// avoids getting stuck when trying to increase difficulty subject to dampening
+-        /// Recommended to use same value as DampFactor
+-        type MinDifficulty: Get<u128>;
+-
+-        /// Now that the pallet is instantiable, we need a way to decide which blocks are
+-        /// relevant to this instance. This function does just that.
+-        ///
+-        /// The default implementation assumes that all blocks are relevant which is what
+-        /// you probably want when there is only a single instance.
+-        fn relevant_to_this_instance() -> bool {
+-            true
+-        }
+-    }
+-
+-    #[pallet::pallet]
+-    pub struct Pallet<T, I = ()>(_);
+-
+-    type DifficultyList<T, I> =
+-        [Option<DifficultyAndTimestamp<<<T as Config<I>>::TimeProvider as Time>::Moment>>; 60];
+-
+-    /// Past difficulties and timestamps, from earliest to latest.
+-    #[pallet::storage]
+-    pub type PastDifficultiesAndTimestamps<T: Config<I>, I: 'static = ()> =
+-        StorageValue<_, DifficultyList<T, I>, ValueQuery, EmptyList<T, I>>;
+-
+-    pub struct EmptyList<T: Config<I>, I: 'static = ()>(PhantomData<(T, I)>);
+-    impl<T: Config<I>, I> Get<DifficultyList<T, I>> for EmptyList<T, I> {
+-        fn get() -> DifficultyList<T, I> {
+-            [None; DIFFICULTY_ADJUST_WINDOW as usize]
+-        }
+-    }
+-
+-    /// Current difficulty.
+-    #[pallet::storage]
+-    #[pallet::getter(fn difficulty)]
+-    pub type CurrentDifficulty<T: Config<I>, I: 'static = ()> =
+-        StorageValue<_, Difficulty, ValueQuery>;
+-
+-    /// Initial difficulty.
+-    #[pallet::storage]
+-    pub type InitialDifficulty<T: Config<I>, I: 'static = ()> =
+-        StorageValue<_, Difficulty, ValueQuery>;
+-
+-    #[pallet::genesis_config]
+-    pub struct GenesisConfig<T: Config<I>, I: 'static = ()> {
+-        pub _ph_data: Option<PhantomData<(T, I)>>,
+-        pub initial_difficulty: [u8; 32], // Difficulty = U256
+-    }
+-
+-    #[pallet::genesis_build]
+-    impl<T: Config<I>, I: 'static> BuildGenesisConfig for GenesisConfig<T, I> {
+-        fn build(&self) {
+-            let initial_difficulty = U256::from_little_endian(&self.initial_difficulty);
+-            // Initialize the Current difficulty
+-            CurrentDifficulty::<T, I>::put(&initial_difficulty);
+-
+-            // Store the initial difficulty in storage because we will need it
+-            // during the first DIFFICULTY_ADJUSTMENT_WINDOW blocks (see todo below).
+-            InitialDifficulty::<T, I>::put(&initial_difficulty);
+-        }
+-    }
+-
+-    impl<T: Config<I>, I: 'static> Default for GenesisConfig<T, I> {
+-        fn default() -> Self {
+-            GenesisConfig {
+-                _ph_data: Default::default(),
+-                initial_difficulty: [0u8; 32],
+-            }
+-        }
+-    }
+-
+-    #[pallet::hooks]
+-    impl<T: Config<I>, I: 'static> Hooks<BlockNumberFor<T>> for Pallet<T, I> {
+-        fn on_finalize(_n: BlockNumberFor<T>) {
+-            // First check if this is block is relevant to this instance of the difficulty adjustment algorithm
+-            if !T::relevant_to_this_instance() {
+-                return;
+-            }
+-
+-            let mut data = PastDifficultiesAndTimestamps::<T, I>::get();
+-
+-            for i in 1..data.len() {
+-                data[i - 1] = data[i];
+-            }
+-
+-            data[data.len() - 1] = Some(DifficultyAndTimestamp {
+-                timestamp: T::TimeProvider::now(),
+-                difficulty: Self::difficulty(),
+-            });
+-
+-            let mut ts_delta = 0;
+-            for i in 1..(DIFFICULTY_ADJUST_WINDOW as usize) {
+-                let prev: Option<u128> = data[i - 1].map(|d| d.timestamp.unique_saturated_into());
+-                let cur: Option<u128> = data[i].map(|d| d.timestamp.unique_saturated_into());
+-
+-                let delta = match (prev, cur) {
+-                    (Some(prev), Some(cur)) => cur.saturating_sub(prev),
+-                    _ => T::TargetBlockTime::get(),
+-                };
+-                ts_delta += delta;
+-            }
+-
+-            if ts_delta == 0 {
+-                ts_delta = 1;
+-            }
+-
+-            let mut diff_sum = U256::zero();
+-            //TODO Could we just initialize every array cell to the initial difficulty to not need the
+-            // separate storage item?
+-            for item in data.iter().take(DIFFICULTY_ADJUST_WINDOW as usize) {
+-                let diff = match item.map(|d| d.difficulty) {
+-                    Some(diff) => diff,
+-                    None => InitialDifficulty::<T, I>::get(),
+-                };
+-                diff_sum += diff;
+-            }
+-
+-            if diff_sum < U256::from(T::MinDifficulty::get()) {
+-                diff_sum = U256::from(T::MinDifficulty::get());
+-            }
+-
+-            // Calculate the average length of the adjustment window
+-            let adjustment_window = DIFFICULTY_ADJUST_WINDOW * T::TargetBlockTime::get();
+-
+-            // adjust time delta toward goal subject to dampening and clamping
+-            let adj_ts = clamp(
+-                damp(ts_delta, adjustment_window, T::DampFactor::get()),
+-                adjustment_window,
+-                T::ClampFactor::get(),
+-            );
+-
+-            // minimum difficulty avoids getting stuck due to dampening
+-            let difficulty = min(
+-                U256::from(T::MaxDifficulty::get()),
+-                max(
+-                    U256::from(T::MinDifficulty::get()),
+-                    diff_sum * U256::from(T::TargetBlockTime::get()) / U256::from(adj_ts),
+-                ),
+-            );
+-
+-            <PastDifficultiesAndTimestamps<T, I>>::put(data);
+-            <CurrentDifficulty<T, I>>::put(difficulty);
+-        }
+-    }
++	use frame_support::pallet_prelude::*;
++	use frame_system::pallet_prelude::*;
++
++	use super::*;
++
++	/// Pallet's configuration trait.
++	#[pallet::config]
++	pub trait Config<I: 'static = ()>: frame_system::Config {
++		/// A Source for timestamp data
++		type TimeProvider: Time;
++		/// The block time that the DAA will attempt to maintain
++		type TargetBlockTime: Get<u128>;
++		/// Dampening factor to use for difficulty adjustment
++		type DampFactor: Get<u128>;
++		/// Clamp factor to use for difficulty adjustment
++		/// Limit value to within this factor of goal. Recommended value: 2
++		type ClampFactor: Get<u128>;
++		/// The maximum difficulty allowed. Recommended to use u128::max_value()
++		type MaxDifficulty: Get<u128>;
++		/// Minimum difficulty, enforced in difficulty retargetting
++		/// avoids getting stuck when trying to increase difficulty subject to dampening
++		/// Recommended to use same value as DampFactor
++		type MinDifficulty: Get<u128>;
++
++		/// Now that the pallet is instantiable, we need a way to decide which blocks are
++		/// relevant to this instance. This function does just that.
++		///
++		/// The default implementation assumes that all blocks are relevant which is what
++		/// you probably want when there is only a single instance.
++		fn relevant_to_this_instance() -> bool {
++			true
++		}
++	}
++
++	#[pallet::pallet]
++	pub struct Pallet<T, I = ()>(_);
++
++	type DifficultyList<T, I> =
++		[Option<DifficultyAndTimestamp<<<T as Config<I>>::TimeProvider as Time>::Moment>>; 60];
++
++	/// Past difficulties and timestamps, from earliest to latest.
++	#[pallet::storage]
++	pub type PastDifficultiesAndTimestamps<T: Config<I>, I: 'static = ()> =
++		StorageValue<_, DifficultyList<T, I>, ValueQuery, EmptyList<T, I>>;
++
++	pub struct EmptyList<T: Config<I>, I: 'static = ()>(PhantomData<(T, I)>);
++	impl<T: Config<I>, I> Get<DifficultyList<T, I>> for EmptyList<T, I> {
++		fn get() -> DifficultyList<T, I> {
++			[None; DIFFICULTY_ADJUST_WINDOW as usize]
++		}
++	}
++
++	/// Current difficulty.
++	#[pallet::storage]
++	#[pallet::getter(fn difficulty)]
++	pub type CurrentDifficulty<T: Config<I>, I: 'static = ()> =
++		StorageValue<_, Difficulty, ValueQuery>;
++
++	/// Initial difficulty.
++	#[pallet::storage]
++	pub type InitialDifficulty<T: Config<I>, I: 'static = ()> =
++		StorageValue<_, Difficulty, ValueQuery>;
++
++	#[pallet::genesis_config]
++	pub struct GenesisConfig<T: Config<I>, I: 'static = ()> {
++		pub _ph_data: Option<PhantomData<(T, I)>>,
++		pub initial_difficulty: [u8; 32], // Difficulty = U256
++	}
++
++	#[pallet::genesis_build]
++	impl<T: Config<I>, I: 'static> BuildGenesisConfig for GenesisConfig<T, I> {
++		fn build(&self) {
++			let initial_difficulty = U256::from_little_endian(&self.initial_difficulty);
++			// Initialize the Current difficulty
++			CurrentDifficulty::<T, I>::put(&initial_difficulty);
++
++			// Store the initial difficulty in storage because we will need it
++			// during the first DIFFICULTY_ADJUSTMENT_WINDOW blocks (see todo below).
++			InitialDifficulty::<T, I>::put(&initial_difficulty);
++		}
++	}
++
++	impl<T: Config<I>, I: 'static> Default for GenesisConfig<T, I> {
++		fn default() -> Self {
++			GenesisConfig { _ph_data: Default::default(), initial_difficulty: [0u8; 32] }
++		}
++	}
++
++	#[pallet::hooks]
++	impl<T: Config<I>, I: 'static> Hooks<BlockNumberFor<T>> for Pallet<T, I> {
++		fn on_finalize(_n: BlockNumberFor<T>) {
++			// First check if this is block is relevant to this instance of the difficulty
++			// adjustment algorithm
++			if !T::relevant_to_this_instance() {
++				return;
++			}
++
++			let mut data = PastDifficultiesAndTimestamps::<T, I>::get();
++
++			for i in 1..data.len() {
++				data[i - 1] = data[i];
++			}
++
++			data[data.len() - 1] = Some(DifficultyAndTimestamp {
++				timestamp: T::TimeProvider::now(),
++				difficulty: Self::difficulty(),
++			});
++
++			let mut ts_delta = 0;
++			for i in 1..(DIFFICULTY_ADJUST_WINDOW as usize) {
++				let prev: Option<u128> = data[i - 1].map(|d| d.timestamp.unique_saturated_into());
++				let cur: Option<u128> = data[i].map(|d| d.timestamp.unique_saturated_into());
++
++				let delta = match (prev, cur) {
++					(Some(prev), Some(cur)) => cur.saturating_sub(prev),
++					_ => T::TargetBlockTime::get(),
++				};
++				ts_delta += delta;
++			}
++
++			if ts_delta == 0 {
++				ts_delta = 1;
++			}
++
++			let mut diff_sum = U256::zero();
++			//TODO Could we just initialize every array cell to the initial difficulty to not need
++			// the separate storage item?
++			for item in data.iter().take(DIFFICULTY_ADJUST_WINDOW as usize) {
++				let diff = match item.map(|d| d.difficulty) {
++					Some(diff) => diff,
++					None => InitialDifficulty::<T, I>::get(),
++				};
++				diff_sum += diff;
++			}
++
++			if diff_sum < U256::from(T::MinDifficulty::get()) {
++				diff_sum = U256::from(T::MinDifficulty::get());
++			}
++
++			// Calculate the average length of the adjustment window
++			let adjustment_window = DIFFICULTY_ADJUST_WINDOW * T::TargetBlockTime::get();
++
++			// adjust time delta toward goal subject to dampening and clamping
++			let adj_ts = clamp(
++				damp(ts_delta, adjustment_window, T::DampFactor::get()),
++				adjustment_window,
++				T::ClampFactor::get(),
++			);
++
++			// minimum difficulty avoids getting stuck due to dampening
++			let difficulty = min(
++				U256::from(T::MaxDifficulty::get()),
++				max(
++					U256::from(T::MinDifficulty::get()),
++					diff_sum * U256::from(T::TargetBlockTime::get()) / U256::from(adj_ts),
++				),
++			);
++
++			<PastDifficultiesAndTimestamps<T, I>>::put(data);
++			<CurrentDifficulty<T, I>>::put(difficulty);
++		}
++	}
+ }
+diff --git a/runtime/src/issuance.rs b/runtime/src/issuance.rs
+index 9a11f9d..a8146c1 100644
+--- a/runtime/src/issuance.rs
++++ b/runtime/src/issuance.rs
+@@ -3,26 +3,28 @@
+ /// A trait for types that can provide the amount of issuance to award to the block
+ /// author for the given block number.
+ pub trait Issuance<BlockNumber, Balance> {
+-    fn issuance(block: BlockNumber) -> Balance;
++	fn issuance(block: BlockNumber) -> Balance;
+ }
+ 
+ // Minimal implementations for when you don't actually want any issuance
+ impl Issuance<u32, u128> for () {
+-    fn issuance(_block: u32) -> u128 {
+-        0
+-    }
++	fn issuance(_block: u32) -> u128 {
++		0
++	}
+ }
+ 
+ impl Issuance<u64, u128> for () {
+-    fn issuance(_block: u64) -> u128 {
+-        0
+-    }
++	fn issuance(_block: u64) -> u128 {
++		0
++	}
+ }
+ 
+ /// A type that provides block issuance according to bitcoin's rules
+ /// Initial issuance is 50 / block
+ /// Issuance is cut in half every 210,000 blocks
+-/// cribbed from github.com/Bitcoin-ABC/bitcoin-abc/blob/9c7b12e6f128a59423f4de3d6d4b5231ebe9aac2/src/validation.cpp#L1007
++/// cribbed from
++/// github.com/Bitcoin-ABC/bitcoin-abc/blob/9c7b12e6f128a59423f4de3d6d4b5231ebe9aac2/src/validation.
++/// cpp#L1007
+ 
+ pub struct BitcoinHalving;
+ 
+@@ -32,16 +34,16 @@ const HALVING_INTERVAL: u32 = 210_000;
+ const INITIAL_ISSUANCE: u32 = 50;
+ 
+ impl Issuance<u32, u128> for BitcoinHalving {
+-    fn issuance(block: u32) -> u128 {
+-        let halving = block / HALVING_INTERVAL;
+-        // Force block reward to zero when right shift is undefined.
+-        if halving >= 64 {
+-            return 0;
+-        }
+-
+-        // Approximately, 600 seconds (or 10 minutes) for a block to be finalized.
+-        // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
+-        // Divided by 2 using bitwise
+-        (INITIAL_ISSUANCE >> halving).into()
+-    }
++	fn issuance(block: u32) -> u128 {
++		let halving = block / HALVING_INTERVAL;
++		// Force block reward to zero when right shift is undefined.
++		if halving >= 64 {
++			return 0;
++		}
++
++		// Approximately, 600 seconds (or 10 minutes) for a block to be finalized.
++		// Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
++		// Divided by 2 using bitwise
++		(INITIAL_ISSUANCE >> halving).into()
++	}
+ }
+diff --git a/runtime/src/lib.rs b/runtime/src/lib.rs
+index 5b09407..b724b7e 100644
+--- a/runtime/src/lib.rs
++++ b/runtime/src/lib.rs
+@@ -9,24 +9,24 @@
+ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
+ 
+ pub use frame_support::{
+-    construct_runtime, parameter_types, derive_impl,
+-    traits::{
+-        Currency, EstimateNextNewSession, Imbalance, IsSubType, KeyOwnerProofSystem,
+-        LockIdentifier, Nothing, OnUnbalanced, ValidatorSet, VariantCountOf,
+-    },
+-    weights::{
+-        constants::{
+-            BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND,
+-        },
+-        IdentityFee, Weight,
+-    },
+-    Callable, StorageValue,
++	construct_runtime, derive_impl, parameter_types,
++	traits::{
++		Currency, EstimateNextNewSession, Imbalance, IsSubType, KeyOwnerProofSystem,
++		LockIdentifier, Nothing, OnUnbalanced, ValidatorSet, VariantCountOf,
++	},
++	weights::{
++		constants::{
++			BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND,
++		},
++		IdentityFee, Weight,
++	},
++	Callable, StorageValue,
+ };
+ use frame_support::{
+-    genesis_builder_helper::{build_state, get_preset},
+-    instances::{Instance1, Instance2, Instance3},
+-    sp_runtime::Perquintill,
+-    traits::{ConstU128, ConstU32, ConstU8},
++	genesis_builder_helper::{build_state, get_preset},
++	instances::{Instance1, Instance2, Instance3},
++	sp_runtime::Perquintill,
++	traits::{ConstU128, ConstU32, ConstU8},
+ };
+ use multi_pow::SupportedHashes;
+ pub use pallet_balances::Call as BalancesCall;
+@@ -40,15 +40,14 @@ use sp_core::OpaqueMetadata;
+ #[cfg(any(feature = "std", test))]
+ pub use sp_runtime::BuildStorage;
+ use sp_runtime::{
+-    create_runtime_str, generic,
+-    traits::{
+-        AccountIdLookup, BlakeTwo256, Block as BlockT, Bounded, IdentifyAccount, One, Verify,
+-    },
+-    transaction_validity::{
+-        InvalidTransaction, TransactionSource, TransactionValidity, TransactionValidityError,
+-    },
+-    ApplyExtrinsicResult, DigestItem, MultiSignature,
+-    ExtrinsicInclusionMode,
++	create_runtime_str, generic,
++	traits::{
++		AccountIdLookup, BlakeTwo256, Block as BlockT, Bounded, IdentifyAccount, One, Verify,
++	},
++	transaction_validity::{
++		InvalidTransaction, TransactionSource, TransactionValidity, TransactionValidityError,
++	},
++	ApplyExtrinsicResult, DigestItem, ExtrinsicInclusionMode, MultiSignature,
+ };
+ pub use sp_runtime::{FixedPointNumber, Perbill, Permill};
+ use sp_std::prelude::*;
+@@ -101,38 +100,35 @@ pub mod utxo;
+ /// of data like extrinsics, allowing for them to continue syncing the network through upgrades
+ /// to even the core data structures.
+ pub mod opaque {
+-    pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
++	pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
+ 
+-    use super::*;
++	use super::*;
+ 
+-    /// Opaque block header type.
+-    pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
+-    /// Opaque block type.
+-    pub type Block = generic::Block<Header, UncheckedExtrinsic>;
+-    /// Opaque block identifier type.
+-    pub type BlockId = generic::BlockId<Block>;
++	/// Opaque block header type.
++	pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
++	/// Opaque block type.
++	pub type Block = generic::Block<Header, UncheckedExtrinsic>;
++	/// Opaque block identifier type.
++	pub type BlockId = generic::BlockId<Block>;
+ }
+ 
+ /// This runtime version.
+ #[sp_version::runtime_version]
+ pub const VERSION: RuntimeVersion = RuntimeVersion {
+-    spec_name: create_runtime_str!("academy-pow"),
+-    impl_name: create_runtime_str!("academy-pow"),
+-    authoring_version: 1,
+-    spec_version: 1,
+-    impl_version: 1,
+-    apis: RUNTIME_API_VERSIONS,
+-    transaction_version: 1,
+-    state_version: 1,
++	spec_name: create_runtime_str!("academy-pow"),
++	impl_name: create_runtime_str!("academy-pow"),
++	authoring_version: 1,
++	spec_version: 1,
++	impl_version: 1,
++	apis: RUNTIME_API_VERSIONS,
++	transaction_version: 1,
++	state_version: 1,
+ };
+ 
+ /// The version information used to identify this runtime when compiled natively.
+ #[cfg(feature = "std")]
+ pub fn native_version() -> NativeVersion {
+-    NativeVersion {
+-        runtime_version: VERSION,
+-        can_author_with: Default::default(),
+-    }
++	NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
+ }
+ 
+ const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
+@@ -142,205 +138,204 @@ pub const TOKEN_DECIMALS: u32 = 12;
+ pub const TOKEN: u128 = 10u128.pow(TOKEN_DECIMALS);
+ 
+ parameter_types! {
+-    pub const BlockHashCount: BlockNumber = 2400;
+-    pub const Version: RuntimeVersion = VERSION;
+-    /// We allow for 2 seconds of compute with a 6 second average block time.
+-    pub BlockWeights: frame_system::limits::BlockWeights =
+-        frame_system::limits::BlockWeights::with_sensible_defaults(
+-            Weight::from_parts(2u64 * WEIGHT_REF_TIME_PER_SECOND, u64::MAX),
+-            NORMAL_DISPATCH_RATIO,
+-        );
+-    pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
+-        ::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
+-    pub const SS58Prefix: u8 = 42;
++	pub const BlockHashCount: BlockNumber = 2400;
++	pub const Version: RuntimeVersion = VERSION;
++	/// We allow for 2 seconds of compute with a 6 second average block time.
++	pub BlockWeights: frame_system::limits::BlockWeights =
++		frame_system::limits::BlockWeights::with_sensible_defaults(
++			Weight::from_parts(2u64 * WEIGHT_REF_TIME_PER_SECOND, u64::MAX),
++			NORMAL_DISPATCH_RATIO,
++		);
++	pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
++		::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
++	pub const SS58Prefix: u8 = 42;
+ }
+ 
+ #[derive_impl(frame_system::config_preludes::SolochainDefaultConfig)]
+ impl frame_system::Config for Runtime {
+-    /// The basic call filter to use in dispatchable.
+-    type BaseCallFilter = frame_support::traits::Everything;
+-    /// Block & extrinsics weights: base values and limits.
+-    type BlockWeights = BlockWeights;
+-    /// The maximum length of a block (in bytes).
+-    type BlockLength = BlockLength;
+-    /// The identifier used to distinguish between accounts.
+-    type AccountId = AccountId;
+-    /// The aggregated dispatch type that is available for extrinsics.
+-    type RuntimeCall = RuntimeCall;
+-    /// The lookup mechanism to get account ID from whatever is passed in dispatchers.
+-    type Lookup = AccountIdLookup<AccountId, ()>;
+-    /// The type for hashing blocks and tries.
+-    type Hash = Hash;
+-    /// The hashing algorithm used.
+-    type Hashing = BlakeTwo256;
+-    /// The ubiquitous event type.
+-    type RuntimeEvent = RuntimeEvent;
+-    /// The ubiquitous origin type.
+-    type RuntimeOrigin = RuntimeOrigin;
+-    /// Maximum number of block number to block hash mappings to keep (oldest pruned first).
+-    type BlockHashCount = BlockHashCount;
+-    /// The weight of database operations that the runtime can invoke.
+-    type DbWeight = RocksDbWeight;
+-    /// Version of the runtime.
+-    type Version = Version;
+-    /// This type is being generated by the construct runtime macro.
+-    type PalletInfo = PalletInfo;
+-    /// What to do if a new account is created.
+-    type OnNewAccount = ();
+-    /// What to do if an account is fully reaped from the system.
+-    type OnKilledAccount = ();
+-    /// The data to be stored in an account.
+-    type AccountData = pallet_balances::AccountData<Balance>;
+-    /// Weight information for the extrinsics of this pallet.
+-    type SystemWeightInfo = ();
+-    /// This is used as an identifier of the chain. 42 is the generic substrate prefix.
+-    type SS58Prefix = SS58Prefix;
+-    /// The set code logic, just the default since we're not a parachain.
+-    type OnSetCode = ();
+-    type MaxConsumers = frame_support::traits::ConstU32<16>;
+-    type Nonce = Nonce;
+-    type Block = Block;
++	/// The basic call filter to use in dispatchable.
++	type BaseCallFilter = frame_support::traits::Everything;
++	/// Block & extrinsics weights: base values and limits.
++	type BlockWeights = BlockWeights;
++	/// The maximum length of a block (in bytes).
++	type BlockLength = BlockLength;
++	/// The identifier used to distinguish between accounts.
++	type AccountId = AccountId;
++	/// The aggregated dispatch type that is available for extrinsics.
++	type RuntimeCall = RuntimeCall;
++	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
++	type Lookup = AccountIdLookup<AccountId, ()>;
++	/// The type for hashing blocks and tries.
++	type Hash = Hash;
++	/// The hashing algorithm used.
++	type Hashing = BlakeTwo256;
++	/// The ubiquitous event type.
++	type RuntimeEvent = RuntimeEvent;
++	/// The ubiquitous origin type.
++	type RuntimeOrigin = RuntimeOrigin;
++	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
++	type BlockHashCount = BlockHashCount;
++	/// The weight of database operations that the runtime can invoke.
++	type DbWeight = RocksDbWeight;
++	/// Version of the runtime.
++	type Version = Version;
++	/// This type is being generated by the construct runtime macro.
++	type PalletInfo = PalletInfo;
++	/// What to do if a new account is created.
++	type OnNewAccount = ();
++	/// What to do if an account is fully reaped from the system.
++	type OnKilledAccount = ();
++	/// The data to be stored in an account.
++	type AccountData = pallet_balances::AccountData<Balance>;
++	/// Weight information for the extrinsics of this pallet.
++	type SystemWeightInfo = ();
++	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
++	type SS58Prefix = SS58Prefix;
++	/// The set code logic, just the default since we're not a parachain.
++	type OnSetCode = ();
++	type MaxConsumers = frame_support::traits::ConstU32<16>;
++	type Nonce = Nonce;
++	type Block = Block;
+ }
+ 
+ parameter_types! {
+-    pub const MinimumPeriod: u64 = 1000;
++	pub const MinimumPeriod: u64 = 1000;
+ }
+ 
+ impl pallet_timestamp::Config for Runtime {
+-    /// A timestamp: milliseconds since the unix epoch.
+-    type Moment = u64;
+-    type OnTimestampSet = ();
+-    type MinimumPeriod = MinimumPeriod;
+-    type WeightInfo = ();
++	/// A timestamp: milliseconds since the unix epoch.
++	type Moment = u64;
++	type OnTimestampSet = ();
++	type MinimumPeriod = MinimumPeriod;
++	type WeightInfo = ();
+ }
+ 
+ impl pallet_balances::Config for Runtime {
+-    type MaxLocks = ConstU32<50>;
+-    type MaxReserves = ();
+-    type ReserveIdentifier = [u8; 8];
+-    /// The type for recording an account's balance.
+-    type Balance = Balance;
+-    /// The ubiquitous event type.
+-    type RuntimeEvent = RuntimeEvent;
+-    type DustRemoval = ();
+-    type ExistentialDeposit = ConstU128<500>;
+-    type AccountStore = System;
+-    type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+-    type FreezeIdentifier = RuntimeFreezeReason;
+-    type MaxFreezes = VariantCountOf<RuntimeFreezeReason>;
+-    type RuntimeHoldReason = RuntimeHoldReason;
+-    type RuntimeFreezeReason = RuntimeFreezeReason;
++	type MaxLocks = ConstU32<50>;
++	type MaxReserves = ();
++	type ReserveIdentifier = [u8; 8];
++	/// The type for recording an account's balance.
++	type Balance = Balance;
++	/// The ubiquitous event type.
++	type RuntimeEvent = RuntimeEvent;
++	type DustRemoval = ();
++	type ExistentialDeposit = ConstU128<500>;
++	type AccountStore = System;
++	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
++	type FreezeIdentifier = RuntimeFreezeReason;
++	type MaxFreezes = VariantCountOf<RuntimeFreezeReason>;
++	type RuntimeHoldReason = RuntimeHoldReason;
++	type RuntimeFreezeReason = RuntimeFreezeReason;
+ }
+ 
+ parameter_types! {
+-    pub const TargetBlockTime: u128 = 5_000;
+-    // Setting min difficulty to damp factor per recommendation
+-    pub const DampFactor: u128 = 3;
+-    pub const ClampFactor: u128 = 2;
+-    pub const MaxDifficulty: u128 = u128::max_value();
++	pub const TargetBlockTime: u128 = 5_000;
++	// Setting min difficulty to damp factor per recommendation
++	pub const DampFactor: u128 = 3;
++	pub const ClampFactor: u128 = 2;
++	pub const MaxDifficulty: u128 = u128::max_value();
+ }
+ 
+ // Helper function to get the current blocks PoW algo from the predigest
+ fn current_blocks_mining_algo() -> SupportedHashes {
+-    System::digest()
+-        .logs
+-        .iter()
+-        .find_map(|digest_item| match digest_item {
+-            DigestItem::PreRuntime(POW_ENGINE_ID, pre_digest) => {
+-                PreDigest::decode(&mut &pre_digest[..]).map(|d| d.1).ok()
+-            }
+-            _ => None,
+-        })
+-        .expect("There should be exactly one pow pre-digest item")
++	System::digest()
++		.logs
++		.iter()
++		.find_map(|digest_item| match digest_item {
++			DigestItem::PreRuntime(POW_ENGINE_ID, pre_digest) =>
++				PreDigest::decode(&mut &pre_digest[..]).map(|d| d.1).ok(),
++			_ => None,
++		})
++		.expect("There should be exactly one pow pre-digest item")
+ }
+ 
+ impl difficulty::Config<Instance1> for Runtime {
+-    type TimeProvider = Timestamp;
+-    type TargetBlockTime = TargetBlockTime;
+-    type DampFactor = DampFactor;
+-    type ClampFactor = ClampFactor;
+-    type MaxDifficulty = MaxDifficulty;
+-    type MinDifficulty = DampFactor;
+-
+-    fn relevant_to_this_instance() -> bool {
+-        current_blocks_mining_algo() == SupportedHashes::Md5
+-    }
++	type TimeProvider = Timestamp;
++	type TargetBlockTime = TargetBlockTime;
++	type DampFactor = DampFactor;
++	type ClampFactor = ClampFactor;
++	type MaxDifficulty = MaxDifficulty;
++	type MinDifficulty = DampFactor;
++
++	fn relevant_to_this_instance() -> bool {
++		current_blocks_mining_algo() == SupportedHashes::Md5
++	}
+ }
+ 
+ impl difficulty::Config<Instance2> for Runtime {
+-    type TimeProvider = Timestamp;
+-    type TargetBlockTime = TargetBlockTime;
+-    type DampFactor = DampFactor;
+-    type ClampFactor = ClampFactor;
+-    type MaxDifficulty = MaxDifficulty;
+-    type MinDifficulty = DampFactor;
+-
+-    fn relevant_to_this_instance() -> bool {
+-        current_blocks_mining_algo() == SupportedHashes::Sha3
+-    }
++	type TimeProvider = Timestamp;
++	type TargetBlockTime = TargetBlockTime;
++	type DampFactor = DampFactor;
++	type ClampFactor = ClampFactor;
++	type MaxDifficulty = MaxDifficulty;
++	type MinDifficulty = DampFactor;
++
++	fn relevant_to_this_instance() -> bool {
++		current_blocks_mining_algo() == SupportedHashes::Sha3
++	}
+ }
+ 
+ impl difficulty::Config<Instance3> for Runtime {
+-    type TimeProvider = Timestamp;
+-    type TargetBlockTime = TargetBlockTime;
+-    type DampFactor = DampFactor;
+-    type ClampFactor = ClampFactor;
+-    type MaxDifficulty = MaxDifficulty;
+-    type MinDifficulty = DampFactor;
+-
+-    fn relevant_to_this_instance() -> bool {
+-        current_blocks_mining_algo() == SupportedHashes::Keccak
+-    }
++	type TimeProvider = Timestamp;
++	type TargetBlockTime = TargetBlockTime;
++	type DampFactor = DampFactor;
++	type ClampFactor = ClampFactor;
++	type MaxDifficulty = MaxDifficulty;
++	type MinDifficulty = DampFactor;
++
++	fn relevant_to_this_instance() -> bool {
++		current_blocks_mining_algo() == SupportedHashes::Keccak
++	}
+ }
+ 
+ impl block_author::Config for Runtime {
+-    // Each block mined issues 50 new tokens to the miner
+-    fn on_author_set(author_account: Self::AccountId) {
+-        let issuance = 50 * TOKEN;
+-        let _ = Balances::deposit_creating(&author_account, issuance);
+-    }
++	// Each block mined issues 50 new tokens to the miner
++	fn on_author_set(author_account: Self::AccountId) {
++		let issuance = 50 * TOKEN;
++		let _ = Balances::deposit_creating(&author_account, issuance);
++	}
+ }
+ 
+ parameter_types! {
+-    // This value increases the priority of `Operational` transactions by adding
+-    // a "virtual tip" that's equal to the `OperationalFeeMultiplier * final_fee`.
+-    // follows polkadot : https://github.com/paritytech/polkadot/blob/9ce5f7ef5abb1a4291454e8c9911b304d80679f9/runtime/polkadot/src/lib.rs#L369
+-    pub const OperationalFeeMultiplier: u8 = 5;
+-    // We expect that on average 25% of the normal capacity will be occupied with normal txs.
+-    pub const TargetSaturationLevel: Perquintill = Perquintill::from_percent(25);
+-    // During 20 blocks the fee may not change more than by 100%. This, together with the
+-    // `TargetSaturationLevel` value, results in variability ~0.067. For the corresponding
+-    // formulas please refer to Substrate code at `frame/transaction-payment/src/lib.rs`.
+-    pub FeeVariability: Multiplier = Multiplier::saturating_from_rational(67, 1000);
+-    // Fee should never be lower than the computational cost.
+-    pub MinimumMultiplier: Multiplier = Multiplier::one();
+-    pub MaximumMultiplier: Multiplier = Bounded::max_value();
++	// This value increases the priority of `Operational` transactions by adding
++	// a "virtual tip" that's equal to the `OperationalFeeMultiplier * final_fee`.
++	// follows polkadot : https://github.com/paritytech/polkadot/blob/9ce5f7ef5abb1a4291454e8c9911b304d80679f9/runtime/polkadot/src/lib.rs#L369
++	pub const OperationalFeeMultiplier: u8 = 5;
++	// We expect that on average 25% of the normal capacity will be occupied with normal txs.
++	pub const TargetSaturationLevel: Perquintill = Perquintill::from_percent(25);
++	// During 20 blocks the fee may not change more than by 100%. This, together with the
++	// `TargetSaturationLevel` value, results in variability ~0.067. For the corresponding
++	// formulas please refer to Substrate code at `frame/transaction-payment/src/lib.rs`.
++	pub FeeVariability: Multiplier = Multiplier::saturating_from_rational(67, 1000);
++	// Fee should never be lower than the computational cost.
++	pub MinimumMultiplier: Multiplier = Multiplier::one();
++	pub MaximumMultiplier: Multiplier = Bounded::max_value();
+ }
+ 
+ parameter_types! {
+-    pub FeeMultiplier: Multiplier = Multiplier::one();
++	pub FeeMultiplier: Multiplier = Multiplier::one();
+ }
+ 
+ impl pallet_transaction_payment::Config for Runtime {
+-    type RuntimeEvent = RuntimeEvent;
+-    type OnChargeTransaction = FungibleAdapter<Balances, ()>;
+-    type OperationalFeeMultiplier = ConstU8<5>;
+-    type WeightToFee = IdentityFee<Balance>;
+-    type LengthToFee = IdentityFee<Balance>;
+-    type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
++	type RuntimeEvent = RuntimeEvent;
++	type OnChargeTransaction = FungibleAdapter<Balances, ()>;
++	type OperationalFeeMultiplier = ConstU8<5>;
++	type WeightToFee = IdentityFee<Balance>;
++	type LengthToFee = IdentityFee<Balance>;
++	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
+ }
+ 
+ construct_runtime!(
+-    pub struct Runtime {
+-        System: frame_system,
+-        Timestamp: pallet_timestamp,
+-        Balances: pallet_balances,
+-        TransactionPayment: pallet_transaction_payment,
+-        Md5DifficultyAdjustment: difficulty::<Instance1>,
+-        Sha3DifficultyAdjustment: difficulty::<Instance2>,
+-        KeccakDifficultyAdjustment: difficulty::<Instance3>,
+-        BlockAuthor: block_author,
+-    }
++	pub struct Runtime {
++		System: frame_system,
++		Timestamp: pallet_timestamp,
++		Balances: pallet_balances,
++		TransactionPayment: pallet_transaction_payment,
++		Md5DifficultyAdjustment: difficulty::<Instance1>,
++		Sha3DifficultyAdjustment: difficulty::<Instance2>,
++		KeccakDifficultyAdjustment: difficulty::<Instance3>,
++		BlockAuthor: block_author,
++	}
+ );
+ 
+ /// The address format for describing accounts.
+@@ -353,177 +348,177 @@ pub type Block = generic::Block<Header, UncheckedExtrinsic>;
+ pub type SignedBlock = generic::SignedBlock<Block>;
+ /// The SignedExtension to the basic transaction logic.
+ pub type SignedExtra = (
+-    frame_system::CheckNonZeroSender<Runtime>,
+-    frame_system::CheckSpecVersion<Runtime>,
+-    frame_system::CheckTxVersion<Runtime>,
+-    frame_system::CheckGenesis<Runtime>,
+-    frame_system::CheckEra<Runtime>,
+-    frame_system::CheckNonce<Runtime>,
+-    frame_system::CheckWeight<Runtime>,
+-    pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
++	frame_system::CheckNonZeroSender<Runtime>,
++	frame_system::CheckSpecVersion<Runtime>,
++	frame_system::CheckTxVersion<Runtime>,
++	frame_system::CheckGenesis<Runtime>,
++	frame_system::CheckEra<Runtime>,
++	frame_system::CheckNonce<Runtime>,
++	frame_system::CheckWeight<Runtime>,
++	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+ );
+ /// Unchecked extrinsic type as expected by this runtime.
+ pub type UncheckedExtrinsic =
+-    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
++	generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+ /// Executive: handles dispatch to the various modules.
+ pub type Executive = frame_executive::Executive<
+-    Runtime,
+-    Block,
+-    frame_system::ChainContext<Runtime>,
+-    Runtime,
+-    AllPalletsWithSystem,
++	Runtime,
++	Block,
++	frame_system::ChainContext<Runtime>,
++	Runtime,
++	AllPalletsWithSystem,
+ >;
+ 
+ impl_runtime_apis! {
+-    impl sp_api::Core<Block> for Runtime {
+-        fn version() -> RuntimeVersion {
+-            VERSION
+-        }
+-
+-        fn execute_block(block: Block) {
+-            Executive::execute_block(block)
+-        }
+-
+-        fn initialize_block(header: &<Block as BlockT>::Header) -> ExtrinsicInclusionMode {
+-            Executive::initialize_block(header)
+-        }
+-    }
+-
+-    impl sp_api::Metadata<Block> for Runtime {
+-        fn metadata() -> OpaqueMetadata {
+-            OpaqueMetadata::new(Runtime::metadata().into())
+-        }
+-
+-        fn metadata_at_version(version: u32) -> Option<OpaqueMetadata> {
+-            Runtime::metadata_at_version(version)
+-        }
+-
+-        fn metadata_versions() -> sp_std::vec::Vec<u32> {
+-            Runtime::metadata_versions()
+-        }
+-    }
+-
+-    impl sp_block_builder::BlockBuilder<Block> for Runtime {
+-        fn apply_extrinsic(extrinsic: <Block as BlockT>::Extrinsic) -> ApplyExtrinsicResult {
+-            Executive::apply_extrinsic(extrinsic)
+-        }
+-
+-        fn finalize_block() -> <Block as BlockT>::Header {
+-            Executive::finalize_block()
+-        }
+-
+-        fn inherent_extrinsics(data: sp_inherents::InherentData) -> Vec<<Block as BlockT>::Extrinsic> {
+-            data.create_extrinsics()
+-        }
+-
+-        fn check_inherents(
+-            block: Block,
+-            data: sp_inherents::InherentData,
+-        ) -> sp_inherents::CheckInherentsResult {
+-            data.check_extrinsics(&block)
+-        }
+-    }
+-
+-    impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
+-        fn validate_transaction(
+-            source: TransactionSource,
+-            tx: <Block as BlockT>::Extrinsic,
+-            block_hash: <Block as BlockT>::Hash,
+-        ) -> TransactionValidity {
+-            Executive::validate_transaction(source, tx, block_hash)
+-        }
+-    }
+-
+-    impl sp_offchain::OffchainWorkerApi<Block> for Runtime {
+-        fn offchain_worker(header: &<Block as BlockT>::Header) {
+-            Executive::offchain_worker(header)
+-        }
+-    }
+-
+-    impl sp_session::SessionKeys<Block> for Runtime {
+-        fn generate_session_keys(_seed: Option<Vec<u8>>) -> Vec<u8> {
+-            Vec::new()
+-        }
+-
+-        fn decode_session_keys(
+-            _encoded: Vec<u8>,
+-        ) -> Option<Vec<(Vec<u8>, sp_core::crypto::KeyTypeId)>> {
+-            None
+-        }
+-    }
+-
+-    impl sp_consensus_pow::DifficultyApi<Block, multi_pow::Threshold> for Runtime {
+-        fn difficulty() -> multi_pow::Threshold {
+-            multi_pow::Threshold {
+-                md5: Md5DifficultyAdjustment::difficulty(),
+-                sha3: Sha3DifficultyAdjustment::difficulty(),
+-                keccak: KeccakDifficultyAdjustment::difficulty(),
+-            }
+-        }
+-    }
+-
+-    impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Index> for Runtime {
+-        fn account_nonce(account: AccountId) -> Index {
+-            System::account_nonce(account)
+-        }
+-    }
+-
+-    impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance> for Runtime
+-    {
+-        fn query_info(
+-            uxt: <Block as BlockT>::Extrinsic,
+-            len: u32,
+-        ) -> pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo<Balance> {
+-            TransactionPayment::query_info(uxt, len)
+-        }
+-        fn query_fee_details(
+-            uxt: <Block as BlockT>::Extrinsic,
+-            len: u32,
+-        ) -> pallet_transaction_payment::FeeDetails<Balance> {
+-            TransactionPayment::query_fee_details(uxt, len)
+-        }
+-        fn query_weight_to_fee(weight: Weight) -> Balance {
+-            TransactionPayment::weight_to_fee(weight)
+-        }
+-        fn query_length_to_fee(length: u32) -> Balance {
+-            TransactionPayment::length_to_fee(length)
+-        }
+-    }
+-
+-    impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentCallApi<Block, Balance, RuntimeCall>
+-        for Runtime
+-    {
+-        fn query_call_info(
+-            call: RuntimeCall,
+-            len: u32,
+-        ) -> pallet_transaction_payment::RuntimeDispatchInfo<Balance> {
+-            TransactionPayment::query_call_info(call, len)
+-        }
+-        fn query_call_fee_details(
+-            call: RuntimeCall,
+-            len: u32,
+-        ) -> pallet_transaction_payment::FeeDetails<Balance> {
+-            TransactionPayment::query_call_fee_details(call, len)
+-        }
+-        fn query_weight_to_fee(weight: Weight) -> Balance {
+-            TransactionPayment::weight_to_fee(weight)
+-        }
+-        fn query_length_to_fee(length: u32) -> Balance {
+-            TransactionPayment::length_to_fee(length)
+-        }
+-    }
+-
+-    impl sp_genesis_builder::GenesisBuilder<Block> for Runtime {
+-        fn build_state(config: Vec<u8>) -> sp_genesis_builder::Result {
+-            build_state::<RuntimeGenesisConfig>(config)
+-        }
+-
+-        fn get_preset(id: &Option<sp_genesis_builder::PresetId>) -> Option<Vec<u8>> {
+-            get_preset::<RuntimeGenesisConfig>(id, |_| None)
+-        }
+-
+-        fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
+-            Default::default()
+-        }
+-    }
++	impl sp_api::Core<Block> for Runtime {
++		fn version() -> RuntimeVersion {
++			VERSION
++		}
++
++		fn execute_block(block: Block) {
++			Executive::execute_block(block)
++		}
++
++		fn initialize_block(header: &<Block as BlockT>::Header) -> ExtrinsicInclusionMode {
++			Executive::initialize_block(header)
++		}
++	}
++
++	impl sp_api::Metadata<Block> for Runtime {
++		fn metadata() -> OpaqueMetadata {
++			OpaqueMetadata::new(Runtime::metadata().into())
++		}
++
++		fn metadata_at_version(version: u32) -> Option<OpaqueMetadata> {
++			Runtime::metadata_at_version(version)
++		}
++
++		fn metadata_versions() -> sp_std::vec::Vec<u32> {
++			Runtime::metadata_versions()
++		}
++	}
++
++	impl sp_block_builder::BlockBuilder<Block> for Runtime {
++		fn apply_extrinsic(extrinsic: <Block as BlockT>::Extrinsic) -> ApplyExtrinsicResult {
++			Executive::apply_extrinsic(extrinsic)
++		}
++
++		fn finalize_block() -> <Block as BlockT>::Header {
++			Executive::finalize_block()
++		}
++
++		fn inherent_extrinsics(data: sp_inherents::InherentData) -> Vec<<Block as BlockT>::Extrinsic> {
++			data.create_extrinsics()
++		}
++
++		fn check_inherents(
++			block: Block,
++			data: sp_inherents::InherentData,
++		) -> sp_inherents::CheckInherentsResult {
++			data.check_extrinsics(&block)
++		}
++	}
++
++	impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
++		fn validate_transaction(
++			source: TransactionSource,
++			tx: <Block as BlockT>::Extrinsic,
++			block_hash: <Block as BlockT>::Hash,
++		) -> TransactionValidity {
++			Executive::validate_transaction(source, tx, block_hash)
++		}
++	}
++
++	impl sp_offchain::OffchainWorkerApi<Block> for Runtime {
++		fn offchain_worker(header: &<Block as BlockT>::Header) {
++			Executive::offchain_worker(header)
++		}
++	}
++
++	impl sp_session::SessionKeys<Block> for Runtime {
++		fn generate_session_keys(_seed: Option<Vec<u8>>) -> Vec<u8> {
++			Vec::new()
++		}
++
++		fn decode_session_keys(
++			_encoded: Vec<u8>,
++		) -> Option<Vec<(Vec<u8>, sp_core::crypto::KeyTypeId)>> {
++			None
++		}
++	}
++
++	impl sp_consensus_pow::DifficultyApi<Block, multi_pow::Threshold> for Runtime {
++		fn difficulty() -> multi_pow::Threshold {
++			multi_pow::Threshold {
++				md5: Md5DifficultyAdjustment::difficulty(),
++				sha3: Sha3DifficultyAdjustment::difficulty(),
++				keccak: KeccakDifficultyAdjustment::difficulty(),
++			}
++		}
++	}
++
++	impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Index> for Runtime {
++		fn account_nonce(account: AccountId) -> Index {
++			System::account_nonce(account)
++		}
++	}
++
++	impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance> for Runtime
++	{
++		fn query_info(
++			uxt: <Block as BlockT>::Extrinsic,
++			len: u32,
++		) -> pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo<Balance> {
++			TransactionPayment::query_info(uxt, len)
++		}
++		fn query_fee_details(
++			uxt: <Block as BlockT>::Extrinsic,
++			len: u32,
++		) -> pallet_transaction_payment::FeeDetails<Balance> {
++			TransactionPayment::query_fee_details(uxt, len)
++		}
++		fn query_weight_to_fee(weight: Weight) -> Balance {
++			TransactionPayment::weight_to_fee(weight)
++		}
++		fn query_length_to_fee(length: u32) -> Balance {
++			TransactionPayment::length_to_fee(length)
++		}
++	}
++
++	impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentCallApi<Block, Balance, RuntimeCall>
++		for Runtime
++	{
++		fn query_call_info(
++			call: RuntimeCall,
++			len: u32,
++		) -> pallet_transaction_payment::RuntimeDispatchInfo<Balance> {
++			TransactionPayment::query_call_info(call, len)
++		}
++		fn query_call_fee_details(
++			call: RuntimeCall,
++			len: u32,
++		) -> pallet_transaction_payment::FeeDetails<Balance> {
++			TransactionPayment::query_call_fee_details(call, len)
++		}
++		fn query_weight_to_fee(weight: Weight) -> Balance {
++			TransactionPayment::weight_to_fee(weight)
++		}
++		fn query_length_to_fee(length: u32) -> Balance {
++			TransactionPayment::length_to_fee(length)
++		}
++	}
++
++	impl sp_genesis_builder::GenesisBuilder<Block> for Runtime {
++		fn build_state(config: Vec<u8>) -> sp_genesis_builder::Result {
++			build_state::<RuntimeGenesisConfig>(config)
++		}
++
++		fn get_preset(id: &Option<sp_genesis_builder::PresetId>) -> Option<Vec<u8>> {
++			get_preset::<RuntimeGenesisConfig>(id, |_| None)
++		}
++
++		fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
++			Default::default()
++		}
++	}
+ }
+diff --git a/runtime/src/utxo.rs b/runtime/src/utxo.rs
+index d51c203..d387d16 100644
+--- a/runtime/src/utxo.rs
++++ b/runtime/src/utxo.rs
+@@ -6,8 +6,8 @@ use scale_info::TypeInfo;
+ #[cfg(feature = "std")]
+ use serde::{Deserialize, Serialize};
+ use sp_core::{
+-    sr25519::{Public, Signature},
+-    ByteArray, H256, H512,
++	sr25519::{Public, Signature},
++	ByteArray, H256, H512,
+ };
+ use sp_runtime::traits::{BlakeTwo256, Hash, SaturatedConversion};
+ use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
+@@ -18,14 +18,14 @@ pub use pallet::*;
+ 
+ #[frame_support::pallet(dev_mode)]
+ pub mod pallet {
+-    use frame_support::pallet_prelude::*;
+-    use frame_system::pallet_prelude::*;
++	use frame_support::pallet_prelude::*;
++	use frame_system::pallet_prelude::*;
+ 
+-    use super::*;
++	use super::*;
+ 
+-    #[pallet::config]
+-    pub trait Config: frame_system::Config { }
++	#[pallet::config]
++	pub trait Config: frame_system::Config {}
+ 
+-    #[pallet::pallet]
+-    pub struct Pallet<T>(_);
++	#[pallet::pallet]
++	pub struct Pallet<T>(_);
+ }
+diff --git a/rustfmt.toml b/rustfmt.toml
+index af85000..c342153 100644
+--- a/rustfmt.toml
++++ b/rustfmt.toml
+@@ -1,7 +1,24 @@
++# Basic
+ edition = "2021"
+-use_field_init_shorthand = true
+-reorder_modules = true
+-
++hard_tabs = true
++max_width = 100
++use_small_heuristics = "Max"
++# Imports
+ imports_granularity = "Crate"
+-group_imports = "StdExternalCrate"
+ reorder_imports = true
++# Consistency
++newline_style = "Unix"
++# Misc
++chain_width = 80
++spaces_around_ranges = false
++binop_separator = "Back"
++reorder_impl_items = false
++match_arm_leading_pipes = "Preserve"
++match_arm_blocks = false
++match_block_trailing_comma = true
++trailing_comma = "Vertical"
++trailing_semicolon = false
++use_field_init_shorthand = true
++# Format comments
++comment_width = 100
++wrap_comments = true

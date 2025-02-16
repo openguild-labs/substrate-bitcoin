@@ -1,0 +1,78 @@
+[profile.release]
+panic = "unwind"
+
+[workspace]
+members = [
+	"node",
+	"runtime",
+	"multi-pow",
+]
+resolver = "2"
+
+[workspace.dependencies]
+
+# Crates.io dependencies
+async-trait = { version = "0.1.53" }
+clap = { version = "4.5.3" }
+futures = { version = "0.3.30" }
+hex = "0.4"
+hex-literal = "0.4.1"
+jsonrpsee = { version = "0.23.2" }
+log = "0.4.25"
+md5 = "0.7.0"
+parity-scale-codec = { version = "3.1.2", features = [ "derive" ], default-features = false }
+rand = { version = "0.8.5", features = [ "small_rng" ] }
+scale-info = { version = "2.11.1", default-features = false }
+serde = "1.0.137"
+serde_json = { version = "1.0.114", default-features = false }
+sha3 = "0.10.1"
+
+# Local Dependencies
+academy-pow-runtime = { path = "../runtime" }
+multi-pow = { default-features = false, path = "../multi-pow" }
+
+# Polkadot SDK Dependencies
+frame-executive = { version = "37.0.0", default-features = false }
+frame-support = { version = "37.0.0", default-features = false }
+frame-system = { version = "37.0.0", default-features = false }
+frame-system-rpc-runtime-api = { version = "34.0.0", default-features = false }
+pallet-balances = { version = "38.0.0", default-features = false }
+pallet-timestamp = { version = "36.0.0", default-features = false }
+pallet-transaction-payment = { version = "37.0.0", default-features = false }
+pallet-transaction-payment-rpc = { version = "40.0.0" }
+pallet-transaction-payment-rpc-runtime-api = { version = "37.0.0", default-features = false }
+sc-basic-authorship = { version = "0.44.0" }
+sc-chain-spec = { version = "37.0.0" }
+sc-cli = { version = "0.46.0", default-features = false }
+sc-client-api = { version = "37.0.0" }
+sc-consensus = { version = "0.43.0" }
+sc-consensus-manual-seal = { version = "0.45.0" }
+sc-consensus-pow = { version = "0.43.0" }
+sc-executor = { version = "0.40.0" }
+sc-network = { version = "0.44.0" }
+sc-rpc-api = { version = "0.43.0" }
+sc-service = { version = "0.45.0", default-features = false }
+sc-telemetry = { version = "24.0.0" }
+sc-transaction-pool = { version = "37.0.0" }
+sc-transaction-pool-api = { version = "37.0.0" }
+sp-api = { version = "34.0.0", default-features = false }
+sp-block-builder = { version = "34.0.0", default-features = false }
+sp-blockchain = { version = "37.0.0" }
+sp-consensus = { version = "0.40.0" }
+sp-consensus-pow = { version = "0.40.0", default-features = false }
+sp-core = { version = "34.0.0", default-features = false }
+sp-genesis-builder = { version = "0.15.0", default-features = false }
+sp-inherents = { version = "34.0.0", default-features = false }
+sp-io = { version = "38.0.0", default-features = false }
+sp-keyring = { version = "39.0.0" }
+sp-keystore = { version = "0.40.0" }
+sp-offchain = { version = "34.0.0", default-features = false }
+sp-runtime = { version = "39.0.0", default-features = false }
+sp-session = { version = "35.0.0", default-features = false }
+sp-std = { version = "14.0.0", default-features = false }
+sp-timestamp = { version = "34.0.0" }
+sp-transaction-pool = { version = "34.0.0", default-features = false }
+sp-version = { version = "37.0.0", default-features = false }
+substrate-build-script-utils = { version = "11.0.0", default-features = false }
+substrate-frame-rpc-system = { version = "38.0.0" }
+substrate-wasm-builder = { version = "24.0.0", default-features = false }
