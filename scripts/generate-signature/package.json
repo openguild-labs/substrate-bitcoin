@@ -1,0 +1,30 @@
+{
+  "name": "academy-pow-main",
+  "version": "1.0.0",
+  "description": "This template is generated from [Polkadot-Blockchain-Academy/Academy-PoW](https://github.com/Polkadot-Blockchain-Academy/Academy-PoW).",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danielbui12/substrate-bitcoin.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/danielbui12/substrate-bitcoin/issues"
+  },
+  "homepage": "https://github.com/danielbui12/substrate-bitcoin#readme",
+  "dependencies": {
+    "@polkadot/api": "^15.1.1",
+    "@polkadot/keyring": "^13.2.3",
+    "@polkadot/types": "^15.1.1",
+    "@polkadot/util": "^13.2.3",
+    "@polkadot/wasm-crypto": "^7.4.1"
+  }
+}
